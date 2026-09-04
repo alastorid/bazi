@@ -5,101 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="bazi" />
     <title>bazi</title>
-    <link rel="stylesheet" href="terminal.css?v=1" />
+    <link rel="stylesheet" href="terminal.css?v=2" />
   </head>
   <body>
-    <header class="terminal-top">
-      <strong id="siteBrand">bazi</strong>
-      <span id="perfBadge">SQLite WASM</span>
-      <button class="theme-button" id="themeToggle" type="button" title="切換明暗模式">☾</button>
+    <header class="app-bar">
+      <strong>bazi</strong>
+      <span id="connectionState">SQLite</span>
+      <button id="runSql" class="run-button" type="button" disabled>▶ Execute</button>
+      <button id="themeToggle" class="icon-button" type="button" title="Theme">☾</button>
     </header>
 
-    <main class="terminal-shell">
-      <aside class="filter-rail">
-        <div class="rail-head">
-          <h1>Filter</h1>
-          <p id="datasetMeta" class="muted">載入資料中…</p>
+    <main class="workbench">
+      <section class="query-pane">
+        <div class="pane-tabs">
+          <button class="query-tab active" type="button">SQLQuery1.sql</button>
+          <span id="queryState">Ready</span>
         </div>
-
-        <div class="filter-row">
-          <label>日期起<input id="dateFrom" type="date" /></label>
-          <label>日期迄<input id="dateTo" type="date" /></label>
-        </div>
-        <div class="filter-row">
-          <label>性別<select id="gender"><option value="">全部</option><option>男</option><option>女</option></select></label>
-          <label>時辰<select id="hour"><option value="">全部</option></select></label>
-        </div>
-        <div class="filter-row">
-          <label>命宮<select id="soul"><option value="">全部</option></select></label>
-          <label>身宮<select id="body"><option value="">全部</option></select></label>
-        </div>
-
-        <fieldset>
-          <legend>四化宮位</legend>
-          <div class="filter-row sihua-grid">
-            <label><span class="hua lu">祿</span><select id="huaLu"><option value="">全部</option></select></label>
-            <label><span class="hua quan">權</span><select id="huaQuan"><option value="">全部</option></select></label>
-            <label><span class="hua ke">科</span><select id="huaKe"><option value="">全部</option></select></label>
-            <label><span class="hua ji">忌</span><select id="huaJi"><option value="">全部</option></select></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>星曜條件 <button id="addStarFilter" class="tiny" type="button">＋新增</button></legend>
-          <div id="starFilters"></div>
-        </fieldset>
-
-        <div class="rail-actions">
-          <button id="resetFilters" type="button">重設</button>
-          <button id="runFilters" class="primary" type="button">執行反查</button>
-        </div>
-      </aside>
-
-      <section class="grid-stage">
-        <div class="mode-tabs">
-          <button class="tab active" data-tab="results" type="button">結果</button>
-          <button class="tab" data-tab="sql" type="button">Web SQL</button>
-          <span id="resultMeta">--</span>
-          <div class="toolbar-actions">
-            <button id="showSchema" type="button">Schema</button>
-            <button id="exportCsv" type="button">CSV</button>
-          </div>
-        </div>
-        <div id="resultsPane" class="pane active">
-          <div class="data-grid" id="gridWrap">
-            <table><thead id="gridHead"></thead><tbody id="gridRows"></tbody></table>
-          </div>
-        </div>
-        <div id="sqlPane" class="pane sql-pane">
-          <div class="sql-toolbar">
-            <button id="runSql" class="primary" type="button">Run SQL</button>
-          </div>
-          <textarea id="sqlEditor" spellcheck="false" aria-label="SQL editor">SELECT
-  "KEY", "命宮", "身宮", "化祿星", "化祿宮位",
-  "化權星", "化權宮位", "化科星", "化科宮位",
-  "化忌星", "化忌宮位"
-FROM "命盤"
-WHERE "紫微星等" IN ('廟', '旺')
-ORDER BY "公曆日期", "時辰序號", "性別";</textarea>
+        <div class="editor-wrap">
+          <div class="line-numbers" id="lineNumbers">1</div>
+          <textarea id="sqlEditor" aria-label="SQL query" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">SELECT TOP 1000 *
+FROM "命盤";</textarea>
+          <div id="autocomplete" class="autocomplete" hidden></div>
         </div>
       </section>
 
-      <aside class="detail-panel">
-        <h2 id="detailTitle">Detail</h2>
-        <div id="detailBody"></div>
-      </aside>
+      <div class="splitter" aria-hidden="true"></div>
+
+      <section class="result-pane">
+        <div class="result-tabs">
+          <button class="result-tab active" data-result-tab="results" type="button">Results</button>
+          <button class="result-tab" data-result-tab="messages" type="button">Messages</button>
+          <span id="resultMeta"></span>
+          <button id="exportCsv" type="button" disabled>CSV</button>
+        </div>
+        <div id="resultsView" class="result-view active">
+          <div class="data-grid">
+            <table>
+              <thead id="gridHead"></thead>
+              <tbody id="gridRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <pre id="messagesView" class="result-view messages"></pre>
+      </section>
     </main>
 
-    <dialog id="schemaDialog">
-      <header><strong>命盤 Schema</strong><button id="closeSchema" type="button">×</button></header>
-      <input id="schemaSearch" type="search" placeholder="搜尋欄位，例如 紫微、宮位、主星" />
-      <div id="schemaList"></div>
-    </dialog>
+    <footer class="status-bar">
+      <span id="statusText">Loading…</span>
+      <span id="datasetMeta"></span>
+    </footer>
 
-    <div class="load-status-bar" id="loadStatusBar" aria-live="polite">
-      <span id="loadStatusText">載入 SQLite WASM…</span>
-      <span class="load-status-track"><span class="load-status-fill" id="loadStatusFill"></span></span>
-    </div>
-    <script src="terminal.js?v=1" defer></script>
+    <script src="terminal.js?v=2" defer></script>
   </body>
 </html>

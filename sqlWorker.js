@@ -36,27 +36,34 @@ function isReadOnly(sql) {
   return /^(select|with|explain|pragma)\b/i.test(cleaned) && !/\b(insert|update|delete|drop|alter|create|replace|attach|detach|vacuum)\b/i.test(cleaned);
 }
 
-function query(sql, params = [], maxRows = 1000) {
+function translateTop(sql) {
+  const trimmed = String(sql).trim().replace(/;+\s*$/, "");
+  const match = trimmed.match(/^(\s*SELECT\s+)(DISTINCT\s+)?TOP\s+(\d+)\s+/i);
+  if (!match) return trimmed;
+  const limit = Number(match[3]);
+  const select = `${match[1]}${match[2] || ""}`;
+  return `${select}${trimmed.slice(match[0].length)} LIMIT ${limit}`;
+}
+
+function query(sql, params = []) {
   if (!db) throw new Error("database not ready");
   if (!isReadOnly(sql)) throw new Error("Web SQL Terminal 僅允許 SELECT / WITH / EXPLAIN / PRAGMA 唯讀查詢");
   const started = performance.now();
-  const statement = db.prepare(sql);
+  const statement = db.prepare(translateTop(sql));
   statement.bind(params);
   const columns = statement.getColumnNames();
   const rows = [];
-  let truncated = false;
   while (statement.step()) {
-    if (rows.length >= maxRows) { truncated = true; break; }
     rows.push(statement.getAsObject());
   }
   statement.free();
-  return { columns, rows, truncated, elapsedMs: Math.round(performance.now() - started) };
+  return { columns, rows, elapsedMs: Math.round(performance.now() - started) };
 }
 
 self.addEventListener("message", async (event) => {
   const { id, type, payload = {} } = event.data || {};
   try {
-    const result = type === "init" ? await init() : type === "query" ? query(payload.sql, payload.params, payload.maxRows) : null;
+    const result = type === "init" ? await init() : type === "query" ? query(payload.sql, payload.params) : null;
     if (result === null) throw new Error(`unknown worker action: ${type}`);
     self.postMessage({ id, ok: true, result });
   } catch (error) {
