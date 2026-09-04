@@ -55,7 +55,8 @@ const palaces = [...palaceNames].sort((a, b) => {
 const baseColumns = [
   ["KEY", "TEXT PRIMARY KEY"], ["公曆日期", "TEXT NOT NULL"], ["年", "INTEGER NOT NULL"],
   ["月", "INTEGER NOT NULL"], ["日", "INTEGER NOT NULL"], ["時辰", "TEXT NOT NULL"],
-  ["時辰序號", "INTEGER NOT NULL"], ["性別", "TEXT NOT NULL"], ["農曆日期", "TEXT NOT NULL"],
+  ["時辰序號", "INTEGER NOT NULL"], ["性別", "TEXT NOT NULL"], ["命盤連結", "TEXT NOT NULL"],
+  ["農曆日期", "TEXT NOT NULL"],
   ["年干", "TEXT NOT NULL"], ["年支", "TEXT NOT NULL"], ["命宮", "TEXT NOT NULL"],
   ["身宮", "TEXT NOT NULL"], ["身宮宮位", "TEXT NOT NULL"], ["五行局", "TEXT NOT NULL"],
   ["五行局數", "INTEGER NOT NULL"], ["化祿星", "TEXT"], ["化祿宮位", "TEXT"],
@@ -102,6 +103,7 @@ for (const date of dates) {
         KEY: `${compact}-${hour.label}-${gender.label}`,
         公曆日期: iso, 年: year, 月: date.month, 日: date.day, 時辰: hour.label,
         時辰序號: hour.index, 性別: gender.label,
+        命盤連結: `https://metisziwei.com/chart?y=${year}&m=${date.month}&d=${date.day}&h=${hour.index * 2}&mi=0&g=${gender.code === "female" ? "f" : "m"}`,
         農曆日期: `${chart.lunarInfo.lunarYear}-${chart.lunarInfo.isLeapMonth ? "閏" : ""}${pad2(chart.lunarInfo.lunarMonth)}-${pad2(chart.lunarInfo.lunarDay)}`,
         年干: chart.lunarInfo.yearStem, 年支: chart.lunarInfo.yearBranch,
         命宮: chart.soulBranch, 身宮: chart.bodyBranch, 身宮宮位: chart.bodyPalaceName,

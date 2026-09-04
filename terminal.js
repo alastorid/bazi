@@ -3,9 +3,10 @@ const state = {
   result: { columns: [], rows: [] },
   suggestions: [],
   suggestionIndex: 0,
+  activeQuery: null,
 };
 
-const worker = new Worker("sqlWorker.js?v=7");
+const worker = new Worker("sqlWorker.js?v=9");
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
@@ -13,102 +14,7 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]);
 
-const SAMPLE_QUERIES = {
-  ssr_all: `SELECT TOP 1000
-  "KEY", "性別", "命宮主星", "財帛主星", "官祿主星", "田宅主星",
-  "化祿星", "化祿宮位", "化權星", "化權宮位", "化科星", "化科宮位", "化忌宮位"
-FROM "命盤"
-WHERE "化忌宮位" NOT IN ('命宮', '財帛', '官祿', '田宅')
-  AND "化祿宮位" IN ('命宮', '財帛', '官祿', '田宅')
-  AND (("武曲宮位" IN ('財帛', '官祿', '田宅') AND "武曲星等" IN ('廟', '旺'))
-    OR ("天府宮位" IN ('財帛', '官祿', '田宅') AND "天府星等" IN ('廟', '旺'))
-    OR ("太陰宮位" IN ('財帛', '官祿', '田宅') AND "太陰星等" IN ('廟', '旺')))
-  AND ("財帛全部星" LIKE '%祿存%' OR "官祿全部星" LIKE '%祿存%'
-    OR "田宅全部星" LIKE '%祿存%' OR "化權宮位" IN ('命宮', '財帛', '官祿', '田宅')
-    OR "化科宮位" IN ('命宮', '財帛', '官祿', '田宅'))
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  ssr_noble: `SELECT TOP 1000
-  "KEY", "性別", "命宮主星", "命宮全部星", "官祿主星", "官祿全部星",
-  "化祿星", "化祿宮位", "化權星", "化權宮位", "化科星", "化科宮位", "化忌宮位"
-FROM "命盤"
-WHERE ("命宮主星" LIKE '%紫微%' OR "命宮主星" LIKE '%天府%' OR "命宮主星" LIKE '%武曲%' OR "命宮主星" LIKE '%天相%')
-  AND ("官祿主星" LIKE '%紫微%' OR "官祿主星" LIKE '%天府%' OR "官祿主星" LIKE '%武曲%' OR "官祿主星" LIKE '%天相%')
-  AND "化忌宮位" NOT IN ('命宮', '官祿', '財帛')
-  AND ("命宮全部星" LIKE '%左輔%' OR "命宮全部星" LIKE '%右弼%'
-    OR "命宮全部星" LIKE '%天魁%' OR "命宮全部星" LIKE '%天鉞%'
-    OR "官祿全部星" LIKE '%左輔%' OR "官祿全部星" LIKE '%右弼%'
-    OR "官祿全部星" LIKE '%天魁%' OR "官祿全部星" LIKE '%天鉞%')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  sr_income: `SELECT TOP 1000
-  "KEY", "性別", "財帛主星", "財帛全部星", "官祿主星", "田宅主星",
-  "武曲星等", "天府星等", "化祿星", "化祿宮位", "化忌宮位"
-FROM "命盤"
-WHERE (("武曲宮位" = '財帛' AND "武曲星等" IN ('廟', '旺'))
-    OR ("天府宮位" = '財帛' AND "天府星等" IN ('廟', '旺')))
-  AND ("財帛全部星" LIKE '%祿存%' OR "化祿宮位" = '財帛')
-  AND "化忌宮位" <> '財帛'
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  sr_asset: `SELECT TOP 1000
-  "KEY", "性別", "財帛主星", "財帛全部星", "田宅主星", "田宅全部星",
-  "天府星等", "太陰星等", "武曲星等", "化祿星", "化祿宮位", "化忌宮位"
-FROM "命盤"
-WHERE ("田宅主星" LIKE '%天府%' OR "田宅主星" LIKE '%太陰%' OR "田宅主星" LIKE '%武曲%')
-  AND ("財帛主星" LIKE '%天府%' OR "財帛主星" LIKE '%太陰%' OR "財帛主星" LIKE '%武曲%')
-  AND "化祿宮位" IN ('財帛', '田宅')
-  AND "化忌宮位" NOT IN ('財帛', '田宅')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  sr_windfall: `SELECT TOP 1000
-  "KEY", "性別", "財帛主星", "財帛全部星", "遷移主星", "遷移全部星",
-  "貪狼星等", "破軍星等", "七殺星等", "化祿星", "化祿宮位", "化權星", "化權宮位"
-FROM "命盤"
-WHERE ("財帛主星" LIKE '%貪狼%' OR "財帛主星" LIKE '%破軍%' OR "財帛主星" LIKE '%七殺%')
-  AND ("財帛全部星" LIKE '%火星%' OR "財帛全部星" LIKE '%鈴星%'
-    OR "遷移全部星" LIKE '%火星%' OR "遷移全部星" LIKE '%鈴星%')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  sr_business: `SELECT TOP 1000
-  "KEY", "性別", "財帛主星", "財帛全部星", "遷移主星", "遷移全部星",
-  "貪狼星等", "巨門星等", "武曲星等", "化祿星", "化祿宮位", "化權星", "化權宮位"
-FROM "命盤"
-WHERE ("財帛主星" LIKE '%貪狼%' OR "財帛主星" LIKE '%巨門%' OR "財帛主星" LIKE '%武曲%')
-  AND ("化祿宮位" IN ('財帛', '遷移') OR "化權宮位" IN ('財帛', '遷移'))
-  AND ("財帛全部星" LIKE '%文昌%' OR "財帛全部星" LIKE '%文曲%' OR "財帛全部星" LIKE '%左輔%' OR "財帛全部星" LIKE '%右弼%'
-    OR "遷移全部星" LIKE '%文昌%' OR "遷移全部星" LIKE '%文曲%' OR "遷移全部星" LIKE '%左輔%' OR "遷移全部星" LIKE '%右弼%')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  s_smart: `SELECT TOP 1000
-  "KEY", "性別", "命宮主星", "官祿主星", "命宮全部星", "官祿全部星",
-  "天機星等", "巨門星等", "太陽星等", "化科星", "化科宮位", "化祿星", "化祿宮位"
-FROM "命盤"
-WHERE ("命宮主星" LIKE '%天機%' OR "命宮主星" LIKE '%巨門%' OR "命宮主星" LIKE '%太陽%'
-    OR "官祿主星" LIKE '%天機%' OR "官祿主星" LIKE '%巨門%' OR "官祿主星" LIKE '%太陽%')
-  AND ("化科宮位" IN ('命宮', '官祿') OR "化祿宮位" IN ('命宮', '官祿'))
-  AND ("命宮全部星" LIKE '%文昌%' OR "命宮全部星" LIKE '%文曲%' OR "命宮全部星" LIKE '%天魁%' OR "命宮全部星" LIKE '%天鉞%'
-    OR "官祿全部星" LIKE '%文昌%' OR "官祿全部星" LIKE '%文曲%' OR "官祿全部星" LIKE '%天魁%' OR "官祿全部星" LIKE '%天鉞%')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  s_parents: `SELECT TOP 1000
-  "KEY", "性別", "父母主星", "父母全部星", "田宅主星", "田宅全部星",
-  "紫微星等", "天府星等", "太陽星等", "太陰星等", "化祿星", "化祿宮位", "化忌宮位"
-FROM "命盤"
-WHERE ("父母主星" LIKE '%紫微%' OR "父母主星" LIKE '%天府%' OR "父母主星" LIKE '%太陽%' OR "父母主星" LIKE '%太陰%')
-  AND ("化祿宮位" = '父母' OR "父母全部星" LIKE '%祿存%')
-  AND "化忌宮位" <> '父母'
-  AND ("田宅主星" <> '' OR "化祿宮位" = '田宅')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  s_family: `SELECT TOP 1000
-  "KEY", "性別", "命宮主星", "父母主星", "田宅主星",
-  "命宮全部星", "父母全部星", "田宅全部星", "化祿宮位", "化權宮位", "化科宮位", "化忌宮位"
-FROM "命盤"
-WHERE ("命宮主星" LIKE '%紫微%' OR "命宮主星" LIKE '%天府%' OR "命宮主星" LIKE '%武曲%' OR "命宮主星" LIKE '%天相%')
-  AND ("父母主星" LIKE '%紫微%' OR "父母主星" LIKE '%天府%' OR "父母主星" LIKE '%太陽%' OR "父母主星" LIKE '%太陰%')
-  AND ("田宅主星" LIKE '%天府%' OR "田宅主星" LIKE '%太陰%' OR "田宅主星" LIKE '%武曲%')
-  AND "化祿宮位" IN ('命宮', '父母', '田宅')
-  AND "化忌宮位" NOT IN ('命宮', '父母', '田宅')
-ORDER BY "公曆日期", "時辰序號", "性別";`,
-  top: `SELECT TOP 1000 *\nFROM "命盤";`,
-  sihua: `SELECT TOP 1000\n  "KEY", "化祿星", "化祿宮位", "化權星", "化權宮位",\n  "化科星", "化科宮位", "化忌星", "化忌宮位"\nFROM "命盤"\nWHERE "化忌宮位" = '命宮'\nORDER BY "公曆日期", "時辰序號", "性別";`,
-  daxian: `SELECT TOP 1000\n  "KEY", "命宮大限", "兄弟大限", "夫妻大限", "子女大限",\n  "財帛大限", "疾厄大限", "遷移大限", "僕役大限",\n  "官祿大限", "田宅大限", "福德大限", "父母大限"\nFROM "命盤";`,
-  key: `SELECT *\nFROM "命盤"\nWHERE "KEY" = '20270810-子時-女';`,
-  count: `SELECT COUNT(*) AS "資料筆數", COUNT(DISTINCT "KEY") AS "唯一KEY"\nFROM "命盤";`,
-};
+const { queries: SAMPLE_QUERIES, groups: QUERY_GROUPS, labels: QUERY_LABELS, defaultQuery: DEFAULT_QUERY } = window.BAZI_QUERY_LIBRARY;
 
 function call(type, payload = {}) {
   const id = nextId++;
@@ -134,6 +40,32 @@ function renderLineNumbers() {
   el("#lineNumbers").textContent = Array.from({ length: count }, (_, index) => index + 1).join("\n");
 }
 
+function renderQueryLibrary(filter = "") {
+  const needle = filter.trim().toLocaleLowerCase("zh-Hant");
+  const groups = Object.entries(QUERY_GROUPS).map(([group, keys]) => {
+    const matches = keys.filter((key) => {
+      const haystack = `${group} ${key} ${QUERY_LABELS[key] ?? key}`.toLocaleLowerCase("zh-Hant");
+      return !needle || haystack.includes(needle);
+    });
+    if (!matches.length) return "";
+    const buttons = matches.map((key) => `<button type="button" data-sample="${escapeHtml(key)}" class="${key === state.activeQuery ? "active" : ""}" title="${escapeHtml(key)}">${escapeHtml(QUERY_LABELS[key] ?? key)}</button>`).join("");
+    const open = needle || matches.includes(state.activeQuery) ? " open" : "";
+    return `<details${open}><summary>${escapeHtml(group)} <small>${matches.length}</small></summary>${buttons}</details>`;
+  }).join("");
+  el("#queryLibrary").innerHTML = groups || '<div class="empty-queries">No queries</div>';
+  el("#queryCount").textContent = `(${Object.keys(SAMPLE_QUERIES).length})`;
+}
+
+function loadSampleQuery(key) {
+  if (!SAMPLE_QUERIES[key]) return;
+  state.activeQuery = key;
+  el("#sqlEditor").value = SAMPLE_QUERIES[key];
+  document.querySelectorAll("[data-sample]").forEach((button) => button.classList.toggle("active", button.dataset.sample === key));
+  renderLineNumbers();
+  hideAutocomplete();
+  el("#sqlEditor").focus();
+}
+
 function renderResult() {
   const { columns, rows } = state.result;
   el("#gridHead").innerHTML = columns.length
@@ -142,7 +74,10 @@ function renderResult() {
   el("#gridRows").innerHTML = rows.map((row, index) => `<tr><th class="row-number">${index + 1}</th>${columns.map((column) => {
     const value = row[column];
     const className = value === null ? "null" : typeof value === "number" ? "number" : "";
-    return `<td class="${className}" title="${escapeHtml(value)}">${value === null ? "NULL" : escapeHtml(value)}</td>`;
+    const display = typeof value === "string" && /^https:\/\/metisziwei\.com\/chart\?/.test(value)
+      ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener noreferrer">${escapeHtml(value)}</a>`
+      : value === null ? "NULL" : escapeHtml(value);
+    return `<td class="${className}" title="${escapeHtml(value)}">${display}</td>`;
   }).join("")}</tr>`).join("");
   requestAnimationFrame(() => {
     const table = el("#dataGrid table");
@@ -289,14 +224,11 @@ function bindEvents() {
   document.addEventListener("mousedown", (event) => { if (!event.target.closest(".editor-wrap")) hideAutocomplete(); });
   document.querySelectorAll(".result-tab").forEach((button) => button.addEventListener("click", () => showResultTab(button.dataset.resultTab)));
   el("#exportCsv").addEventListener("click", exportCsv);
-  document.querySelector(".sample-list").addEventListener("click", (event) => {
+  el("#queryLibrary").addEventListener("click", (event) => {
     const key = event.target.closest("[data-sample]")?.dataset.sample;
-    if (!key || !SAMPLE_QUERIES[key]) return;
-    el("#sqlEditor").value = SAMPLE_QUERIES[key];
-    renderLineNumbers();
-    hideAutocomplete();
-    el("#sqlEditor").focus();
+    if (key) loadSampleQuery(key);
   });
+  el("#querySearch").addEventListener("input", (event) => renderQueryLibrary(event.target.value));
   el("#horizontalScroll").addEventListener("scroll", () => {
     el("#dataGrid").scrollLeft = el("#horizontalScroll").scrollLeft;
   });
@@ -311,6 +243,9 @@ function bindEvents() {
 
 async function boot() {
   document.documentElement.classList.toggle("dark", localStorage.getItem("bazi.theme") !== "light");
+  state.activeQuery = DEFAULT_QUERY;
+  el("#sqlEditor").value = SAMPLE_QUERIES[DEFAULT_QUERY];
+  renderQueryLibrary();
   bindEvents();
   renderLineNumbers();
   try {

@@ -11,7 +11,7 @@ fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, "data"), { recursive: true });
 fs.mkdirSync(path.join(dist, "vendor", "sqljs"), { recursive: true });
 
-for (const file of ["index.html", "terminal.css", "terminal.js", "sqlWorker.js", ".nojekyll"]) {
+for (const file of ["index.html", "terminal.css", "terminal.js", "queryLibrary.js", "sqlWorker.js", ".nojekyll"]) {
   fs.copyFileSync(path.join(root, file), path.join(dist, file));
 }
 for (const file of ["metadata.json", `ziwei-${year}.sqlite.gz`]) {

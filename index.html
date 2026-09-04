@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="bazi" />
     <title>bazi</title>
-    <link rel="stylesheet" href="terminal.css?v=7" />
+    <link rel="stylesheet" href="terminal.css?v=8" />
   </head>
   <body>
     <header class="app-bar">
@@ -17,35 +17,9 @@
 
     <div class="app-body">
       <aside class="object-explorer">
-        <div class="explorer-title">Sample Queries</div>
-        <div class="sample-list">
-          <details open>
-            <summary>SSR</summary>
-            <button type="button" data-sample="ssr_all">👑 財官田全旺</button>
-            <button type="button" data-sample="ssr_noble">👑 紫府武相權貴</button>
-          </details>
-          <details open>
-            <summary>SR</summary>
-            <button type="button" data-sample="sr_income">💰 武府超強正財</button>
-            <button type="button" data-sample="sr_asset">🏦 資產型巨富</button>
-            <button type="button" data-sample="sr_windfall">💥 橫財爆發</button>
-            <button type="button" data-sample="sr_business">📈 商業型富命</button>
-          </details>
-          <details open>
-            <summary>S</summary>
-            <button type="button" data-sample="s_smart">🧠 聰明賺錢</button>
-            <button type="button" data-sample="s_parents">👶 旺父母</button>
-            <button type="button" data-sample="s_family">🏠 旺家族</button>
-          </details>
-          <details>
-            <summary>Tools</summary>
-            <button type="button" data-sample="sihua">四化宮位</button>
-            <button type="button" data-sample="daxian">十二宮大限</button>
-            <button type="button" data-sample="key">KEY 反查</button>
-            <button type="button" data-sample="top">TOP 1000</button>
-            <button type="button" data-sample="count">資料筆數</button>
-          </details>
-        </div>
+        <div class="explorer-title">Sample Queries <span id="queryCount"></span></div>
+        <div class="query-search-wrap"><input id="querySearch" type="search" placeholder="Search queries" autocomplete="off" /></div>
+        <div class="sample-list" id="queryLibrary"></div>
       </aside>
 
       <main class="workbench">
@@ -56,19 +30,7 @@
         </div>
         <div class="editor-wrap">
           <div class="line-numbers" id="lineNumbers">1</div>
-          <textarea id="sqlEditor" aria-label="SQL query" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">SELECT TOP 1000
-  "KEY", "性別", "命宮主星", "財帛主星", "官祿主星", "田宅主星",
-  "化祿星", "化祿宮位", "化權星", "化權宮位", "化科星", "化科宮位", "化忌宮位"
-FROM "命盤"
-WHERE "化忌宮位" NOT IN ('命宮', '財帛', '官祿', '田宅')
-  AND "化祿宮位" IN ('命宮', '財帛', '官祿', '田宅')
-  AND (("武曲宮位" IN ('財帛', '官祿', '田宅') AND "武曲星等" IN ('廟', '旺'))
-    OR ("天府宮位" IN ('財帛', '官祿', '田宅') AND "天府星等" IN ('廟', '旺'))
-    OR ("太陰宮位" IN ('財帛', '官祿', '田宅') AND "太陰星等" IN ('廟', '旺')))
-  AND ("財帛全部星" LIKE '%祿存%' OR "官祿全部星" LIKE '%祿存%'
-    OR "田宅全部星" LIKE '%祿存%' OR "化權宮位" IN ('命宮', '財帛', '官祿', '田宅')
-    OR "化科宮位" IN ('命宮', '財帛', '官祿', '田宅'))
-ORDER BY "公曆日期", "時辰序號", "性別";</textarea>
+          <textarea id="sqlEditor" aria-label="SQL query" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
           <div id="autocomplete" class="autocomplete" hidden></div>
         </div>
       </section>
@@ -101,6 +63,7 @@ ORDER BY "公曆日期", "時辰序號", "性別";</textarea>
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="terminal.js?v=7" defer></script>
+    <script src="queryLibrary.js?v=1" defer></script>
+    <script src="terminal.js?v=9" defer></script>
   </body>
 </html>

@@ -6,6 +6,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 
 - 8,760 rows: 365 days × 12 Chinese two-hour periods × 2 genders.
 - Primary key format: `YYYYMMDD-時辰-性別`, for example `20270810-子時-女`.
+- Every row has a direct `命盤連結` to its Metis Zi Wei chart.
 - One deliberately wide, first-normal-form SQLite table named `命盤`.
 - Separate columns for every star's exact brightness and palace.
 - Separate columns for every palace's major stars and all stars.
@@ -52,7 +53,7 @@ WHERE "紫微星等" IN ('廟', '旺')
 ORDER BY "公曆日期";
 ```
 
-The browser terminal is read-only and caps displayed results at 1,000 rows. CSV export exports the currently displayed result.
+The browser terminal is read-only. The bundled queries use `SELECT TOP 1000`; custom queries return their exact result without a hidden row cap. CSV export exports the currently displayed result.
 
 ## Credits
 
