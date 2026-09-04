@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="bazi" />
     <title>bazi</title>
-    <link rel="stylesheet" href="terminal.css?v=4" />
+    <link rel="stylesheet" href="terminal.css?v=5" />
   </head>
   <body>
     <header class="app-bar">
       <strong>bazi</strong>
       <span id="connectionState">SQLite</span>
-      <button id="runSql" class="run-button" type="button" disabled>▶ Execute</button>
+      <button id="runSql" class="run-button" type="button" disabled>▶ Execute (F5)</button>
       <button id="themeToggle" class="icon-button" type="button" title="Theme">☾</button>
     </header>
 
@@ -44,7 +44,8 @@
         <div class="editor-wrap">
           <div class="line-numbers" id="lineNumbers">1</div>
           <textarea id="sqlEditor" aria-label="SQL query" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">SELECT TOP 1000 *
-FROM "命盤";</textarea>
+FROM "命盤"
+WHERE "化忌宮位" = '命宮';</textarea>
           <div id="autocomplete" class="autocomplete" hidden></div>
         </div>
       </section>
@@ -77,6 +78,6 @@ FROM "命盤";</textarea>
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="terminal.js?v=4" defer></script>
+    <script src="terminal.js?v=5" defer></script>
   </body>
 </html>

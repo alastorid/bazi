@@ -5,7 +5,7 @@ const state = {
   suggestionIndex: 0,
 };
 
-const worker = new Worker("sqlWorker.js?v=4");
+const worker = new Worker("sqlWorker.js?v=5");
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
@@ -147,6 +147,11 @@ function applyCompletion(index) {
 }
 
 function handleEditorKeydown(event) {
+  if (event.key === "F5") {
+    event.preventDefault();
+    executeSql();
+    return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
     event.preventDefault();
     executeSql();
