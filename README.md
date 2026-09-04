@@ -22,7 +22,7 @@ npm run build -- 2027
 npm run serve
 ```
 
-Open <http://localhost:8000>. Do not open `index.html` directly because SQLite WASM and the database are fetched by a Web Worker.
+Serve `dist/` through an HTTP server. Do not open `index.html` directly because SQLite WASM and the database are fetched by a Web Worker.
 
 `build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮 and 身宮.
 
@@ -33,6 +33,13 @@ npm run build -- 2028
 ```
 
 No source or UI dates need editing. The site reads its year and date bounds from generated metadata.
+
+## GitHub Pages
+
+The repository does not commit a precomputed database. On every deployment,
+GitHub Actions installs the pinned dependencies, runs `npm run build -- 2027`,
+generates the database on the Actions runner, and publishes only `dist/`.
+The manual workflow accepts a different year input.
 
 ## Example SQL
 

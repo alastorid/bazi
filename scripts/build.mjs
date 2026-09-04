@@ -13,6 +13,7 @@ if (!year || !/^\d{4}$/.test(year)) {
 for (const [script, args] of [
   ["scripts/generate-data.mjs", [year]],
   ["scripts/verify-data.mjs", []],
+  ["scripts/prepare-pages.mjs", [year]],
 ]) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...args], {
     cwd: root,
@@ -21,4 +22,4 @@ for (const [script, args] of [
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-console.log(`\n${year} static site is ready. Run: npm run serve`);
+console.log(`\n${year} static site is ready in dist/`);

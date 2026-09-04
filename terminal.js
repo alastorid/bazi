@@ -146,7 +146,6 @@ function bindEvents() {
   document.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => showTab(button.dataset.tab)));
   el("#runSql").addEventListener("click", () => runQuery(el("#sqlEditor").value));
   el("#sqlEditor").addEventListener("keydown", (event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); runQuery(el("#sqlEditor").value); } });
-  el("#formatSql").addEventListener("click", () => { el("#sqlEditor").value = 'SELECT "KEY", "太陽星等", "太陽宮位", "化祿宮位", "化忌宮位"\nFROM "命盤"\nWHERE "太陽星等" IN (\'廟\', \'旺\')\n  AND "化祿宮位" = \'財帛\'\nORDER BY "公曆日期";'; });
   el("#gridRows").addEventListener("click", (event) => openDetail(event.target.closest("tr")?.dataset.key));
   el("#showSchema").addEventListener("click", () => { renderSchema(); el("#schemaDialog").showModal(); el("#schemaSearch").focus(); });
   el("#closeSchema").addEventListener("click", () => el("#schemaDialog").close());
@@ -161,8 +160,8 @@ async function boot() {
   bindEvents();
   try {
     state.metadata = await call("init");
-    document.title = `${state.metadata.year} 紫微限定反查 · Web SQL Terminal`;
-    el("#siteBrand").textContent = `ZIWEI / ${state.metadata.year}`;
+    document.title = "bazi";
+    el("#siteBrand").textContent = "bazi";
     el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} 張 · ${state.metadata.columns.length} 欄`;
     el("#dateFrom").value = `${state.metadata.year}-01-01`; el("#dateTo").value = `${state.metadata.year}-12-31`;
     el("#hour").innerHTML = optionList(["子時", "丑時", "寅時", "卯時", "辰時", "巳時", "午時", "未時", "申時", "酉時", "戌時", "亥時"]);

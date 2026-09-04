@@ -3,14 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="2027 紫微斗數限定時間範圍反查，支援星等、四化與 Web SQL。" />
-    <title>紫微限定反查 · Web SQL Terminal</title>
+    <meta name="description" content="bazi" />
+    <title>bazi</title>
     <link rel="stylesheet" href="terminal.css?v=1" />
   </head>
   <body>
     <header class="terminal-top">
-      <strong id="siteBrand">ZIWEI</strong>
-      <span class="subtitle">限定時間範圍反查</span>
+      <strong id="siteBrand">bazi</strong>
       <span id="perfBadge">SQLite WASM</span>
       <button class="theme-button" id="themeToggle" type="button" title="切換明暗模式">☾</button>
     </header>
@@ -18,8 +17,7 @@
     <main class="terminal-shell">
       <aside class="filter-rail">
         <div class="rail-head">
-          <p class="eyebrow">FILTER BUILDER</p>
-          <h1>命盤條件</h1>
+          <h1>Filter</h1>
           <p id="datasetMeta" class="muted">載入資料中…</p>
         </div>
 
@@ -55,7 +53,6 @@
           <button id="resetFilters" type="button">重設</button>
           <button id="runFilters" class="primary" type="button">執行反查</button>
         </div>
-        <p class="source-note">每筆一張命盤，KEY = 日期＋時辰＋性別。排盤源自 ziwei-doushu 的 iztro 演算法。結果僅供研究。</p>
       </aside>
 
       <section class="grid-stage">
@@ -75,8 +72,6 @@
         </div>
         <div id="sqlPane" class="pane sql-pane">
           <div class="sql-toolbar">
-            <span>唯讀 SQLite · ⌘/Ctrl + Enter 執行 · 最多顯示 1,000 筆</span>
-            <button id="formatSql" type="button">範例</button>
             <button id="runSql" class="primary" type="button">Run SQL</button>
           </div>
           <textarea id="sqlEditor" spellcheck="false" aria-label="SQL editor">SELECT
@@ -86,16 +81,12 @@
 FROM "命盤"
 WHERE "紫微星等" IN ('廟', '旺')
 ORDER BY "公曆日期", "時辰序號", "性別";</textarea>
-          <div class="sql-help">
-            <code>SELECT * FROM "命盤" WHERE "太陽星等" = '旺' AND "化祿宮位" = '財帛';</code>
-          </div>
         </div>
       </section>
 
       <aside class="detail-panel">
-        <p class="eyebrow">ROW DETAIL</p>
-        <h2 id="detailTitle">選取一筆命盤</h2>
-        <div id="detailBody" class="empty-note">點擊結果列查看十二宮與星曜。</div>
+        <h2 id="detailTitle">Detail</h2>
+        <div id="detailBody"></div>
       </aside>
     </main>
 
