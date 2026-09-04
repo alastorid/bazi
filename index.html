@@ -39,7 +39,7 @@ FROM "命盤";</textarea>
           <button id="exportCsv" type="button" disabled>CSV</button>
         </div>
         <div id="resultsView" class="result-view active">
-          <div class="data-grid">
+          <div class="data-grid" id="dataGrid">
             <table>
               <thead id="gridHead"></thead>
               <tbody id="gridRows"></tbody>
@@ -47,6 +47,7 @@ FROM "命盤";</textarea>
           </div>
         </div>
         <pre id="messagesView" class="result-view messages"></pre>
+        <div id="horizontalScroll" class="horizontal-scroll" aria-label="Horizontal result scroll"><div id="horizontalScrollInner"></div></div>
       </section>
     </main>
 

@@ -47,6 +47,11 @@ function renderResult() {
     const className = value === null ? "null" : typeof value === "number" ? "number" : "";
     return `<td class="${className}" title="${escapeHtml(value)}">${value === null ? "NULL" : escapeHtml(value)}</td>`;
   }).join("")}</tr>`).join("");
+  requestAnimationFrame(() => {
+    const table = el("#dataGrid table");
+    el("#horizontalScrollInner").style.width = `${table.scrollWidth}px`;
+    el("#horizontalScroll").scrollLeft = el("#dataGrid").scrollLeft;
+  });
 }
 
 function showResultTab(name) {
@@ -182,6 +187,12 @@ function bindEvents() {
   document.addEventListener("mousedown", (event) => { if (!event.target.closest(".editor-wrap")) hideAutocomplete(); });
   document.querySelectorAll(".result-tab").forEach((button) => button.addEventListener("click", () => showResultTab(button.dataset.resultTab)));
   el("#exportCsv").addEventListener("click", exportCsv);
+  el("#horizontalScroll").addEventListener("scroll", () => {
+    el("#dataGrid").scrollLeft = el("#horizontalScroll").scrollLeft;
+  });
+  el("#dataGrid").addEventListener("scroll", () => {
+    el("#horizontalScroll").scrollLeft = el("#dataGrid").scrollLeft;
+  });
   el("#themeToggle").addEventListener("click", () => {
     document.documentElement.classList.toggle("dark");
     localStorage.setItem("bazi.theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
