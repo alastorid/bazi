@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="bazi" />
     <title>bazi</title>
-    <link rel="stylesheet" href="terminal.css?v=3" />
+    <link rel="stylesheet" href="terminal.css?v=4" />
   </head>
   <body>
     <header class="app-bar">
@@ -15,7 +15,27 @@
       <button id="themeToggle" class="icon-button" type="button" title="Theme">☾</button>
     </header>
 
-    <main class="workbench">
+    <div class="app-body">
+      <aside class="object-explorer">
+        <div class="explorer-title">Object Explorer</div>
+        <div class="tree">
+          <div class="tree-row root">▾ 🗄 bazi</div>
+          <div class="tree-row level-1">▾ Tables</div>
+          <div class="tree-row level-2 active">▦ 命盤</div>
+          <div class="tree-row level-1">▸ Views</div>
+        </div>
+        <div class="explorer-title samples-title">Sample Queries</div>
+        <div class="sample-list">
+          <button type="button" data-sample="top">TOP 1000</button>
+          <button type="button" data-sample="star">星等＋四化</button>
+          <button type="button" data-sample="sihua">四化宮位</button>
+          <button type="button" data-sample="daxian">十二宮大限</button>
+          <button type="button" data-sample="key">KEY 反查</button>
+          <button type="button" data-sample="count">資料筆數</button>
+        </div>
+      </aside>
+
+      <main class="workbench">
       <section class="query-pane">
         <div class="pane-tabs">
           <button class="query-tab active" type="button">SQLQuery1.sql</button>
@@ -49,13 +69,14 @@ FROM "命盤";</textarea>
         <pre id="messagesView" class="result-view messages"></pre>
         <div id="horizontalScroll" class="horizontal-scroll" aria-label="Horizontal result scroll"><div id="horizontalScrollInner"></div></div>
       </section>
-    </main>
+      </main>
+    </div>
 
     <footer class="status-bar">
       <span id="statusText">Loading…</span>
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="terminal.js?v=3" defer></script>
+    <script src="terminal.js?v=4" defer></script>
   </body>
 </html>

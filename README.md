@@ -9,6 +9,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - One deliberately wide, first-normal-form SQLite table named `命盤`.
 - Separate columns for every star's exact brightness and palace.
 - Separate columns for every palace's major stars and all stars.
+- Twelve palace-specific decadal range columns (`命宮大限` through `父母大限`).
 - Four transformation star/palace pairs: `化祿`, `化權`, `化科`, `化忌`.
 - Direct columns for `命宮`, `身宮`, and `身宮宮位`.
 

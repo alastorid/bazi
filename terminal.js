@@ -5,13 +5,22 @@ const state = {
   suggestionIndex: 0,
 };
 
-const worker = new Worker("sqlWorker.js?v=3");
+const worker = new Worker("sqlWorker.js?v=4");
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]);
+
+const SAMPLE_QUERIES = {
+  top: `SELECT TOP 1000 *\nFROM "命盤";`,
+  star: `SELECT TOP 1000\n  "KEY", "紫微星等", "紫微宮位",\n  "化祿星", "化祿宮位", "化忌星", "化忌宮位"\nFROM "命盤"\nWHERE "紫微星等" IN ('廟', '旺')\n  AND "化祿宮位" = '財帛'\nORDER BY "公曆日期", "時辰序號", "性別";`,
+  sihua: `SELECT TOP 1000\n  "KEY", "化祿星", "化祿宮位", "化權星", "化權宮位",\n  "化科星", "化科宮位", "化忌星", "化忌宮位"\nFROM "命盤"\nWHERE "化祿宮位" = '財帛'\n  AND "化忌宮位" = '命宮';`,
+  daxian: `SELECT TOP 1000\n  "KEY", "命宮大限", "兄弟大限", "夫妻大限", "子女大限",\n  "財帛大限", "疾厄大限", "遷移大限", "僕役大限",\n  "官祿大限", "田宅大限", "福德大限", "父母大限"\nFROM "命盤";`,
+  key: `SELECT *\nFROM "命盤"\nWHERE "KEY" = '20270810-子時-女';`,
+  count: `SELECT COUNT(*) AS "資料筆數", COUNT(DISTINCT "KEY") AS "唯一KEY"\nFROM "命盤";`,
+};
 
 function call(type, payload = {}) {
   const id = nextId++;
@@ -187,6 +196,14 @@ function bindEvents() {
   document.addEventListener("mousedown", (event) => { if (!event.target.closest(".editor-wrap")) hideAutocomplete(); });
   document.querySelectorAll(".result-tab").forEach((button) => button.addEventListener("click", () => showResultTab(button.dataset.resultTab)));
   el("#exportCsv").addEventListener("click", exportCsv);
+  document.querySelector(".sample-list").addEventListener("click", (event) => {
+    const key = event.target.closest("[data-sample]")?.dataset.sample;
+    if (!key || !SAMPLE_QUERIES[key]) return;
+    el("#sqlEditor").value = SAMPLE_QUERIES[key];
+    renderLineNumbers();
+    hideAutocomplete();
+    el("#sqlEditor").focus();
+  });
   el("#horizontalScroll").addEventListener("scroll", () => {
     el("#dataGrid").scrollLeft = el("#horizontalScroll").scrollLeft;
   });

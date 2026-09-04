@@ -63,7 +63,11 @@ const baseColumns = [
   ["化忌星", "TEXT"], ["化忌宮位", "TEXT"],
 ];
 const starColumns = stars.flatMap((star) => [[`${star}星等`, "TEXT"], [`${star}宮位`, "TEXT"]]);
-const palaceColumns = palaces.flatMap((palace) => [[`${palace}主星`, "TEXT"], [`${palace}全部星`, "TEXT"]]);
+const palaceColumns = palaces.flatMap((palace) => [
+  [`${palace}主星`, "TEXT"],
+  [`${palace}全部星`, "TEXT"],
+  [`${palace}大限`, "TEXT"],
+]);
 const columns = [...baseColumns, ...starColumns, ...palaceColumns];
 
 const SQL = await initSqlJs({ locateFile: (file) => path.join(sqlDist, file) });
@@ -116,6 +120,7 @@ for (const date of dates) {
         const palace = byPalace.get(palaceName);
         values[`${palaceName}主星`] = palace?.stars.filter((star) => star.type === "major").map((star) => star.name).join("、") ?? "";
         values[`${palaceName}全部星`] = palace?.stars.map((star) => `${star.name}${star.siHua ? `化${star.siHua}` : ""}${star.brightness ? `(${star.brightness})` : ""}`).join("、") ?? "";
+        values[`${palaceName}大限`] = palace?.daXianRange?.length === 2 ? `${palace.daXianRange[0]}-${palace.daXianRange[1]}` : "";
       }
       insert.run(columns.map(([name]) => values[name] ?? ""));
       rowCount += 1;

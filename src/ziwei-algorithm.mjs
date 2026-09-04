@@ -55,6 +55,7 @@ export function generateChart({ year, month, day, hour, gender }) {
       branch: String(palace.earthlyBranch),
       stem: String(palace.heavenlyStem),
       isBodyPalace: Boolean(palace.isBodyPalace),
+      daXianRange: Array.isArray(palace.decadal?.range) ? palace.decadal.range.map(Number) : [],
       stars,
     };
   });
