@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { generateChart, HOURS, GENDERS } from "../src/ziwei-algorithm.mjs";
+import { buildScoringTables, scoringColumns, SCORE_RULES, RANK_THRESHOLDS, DIMENSION_CONFIG } from "../src/scoring-model.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const year = Number(process.argv[2] || new Date().getFullYear() + 1);
@@ -135,6 +136,8 @@ for (const date of dates) {
 }
 db.run("COMMIT");
 insert.free();
+console.log(`Scoring ${rowCount.toLocaleString()} charts across 8 dimensions…`);
+buildScoringTables(db);
 
 const bytes = Buffer.from(db.export());
 db.close();
@@ -150,6 +153,13 @@ const metadata = {
   rowCount,
   keyFormat: "YYYYMMDD-時辰-性別",
   table: "命盤",
+  tables: {
+    命盤: columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })),
+    命盤評分: [{ name: "KEY", type: "TEXT" }, ...scoringColumns()],
+    評分規則: ["規則ID", "維度", "類型", "權重", "條件SQL", "說明"].map((name) => ({ name, type: name === "權重" ? "REAL" : "TEXT" })),
+    評分維度: [{ name: "維度", type: "TEXT" }, { name: "基礎分", type: "REAL" }, { name: "綜合權重", type: "REAL" }],
+    排名門檻: [{ name: "排名", type: "TEXT" }, { name: "最低百分位", type: "REAL" }],
+  },
   sqlite: `data/ziwei-${year}.sqlite.gz`,
   hash,
   uncompressedBytes: bytes.byteLength,
@@ -158,6 +168,7 @@ const metadata = {
   stars,
   palaces,
   brightness: ["廟", "旺", "得", "利", "平", "不", "陷"],
+  scoring: { dimensions: [...new Set(scoringColumns().map(({ name }) => name.replace(/(分|排名|百分位)$/, "")))], rules: SCORE_RULES.length, configuration: DIMENSION_CONFIG, thresholds: RANK_THRESHOLDS },
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
 console.log(JSON.stringify({ year, rowCount, columns: columns.length, stars: stars.length, palaces: palaces.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));

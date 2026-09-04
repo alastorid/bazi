@@ -6,7 +6,7 @@ const state = {
   activeQuery: null,
 };
 
-const worker = new Worker("sqlWorker.js?v=9");
+const worker = new Worker("sqlWorker.js?v=10");
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
@@ -130,8 +130,10 @@ function currentToken() {
 
 function completionCatalog() {
   const keywords = ["SELECT", "TOP", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL", "AS", "DISTINCT", "ORDER BY", "GROUP BY", "HAVING", "ASC", "DESC", "LIMIT", "OFFSET", "COUNT", "AVG", "MIN", "MAX", "SUM", "CASE", "WHEN", "THEN", "ELSE", "END"];
-  const columns = (state.metadata?.columns ?? []).map(({ name }) => `"${name.replaceAll('"', '""')}"`);
-  return ["\"KEY\"", "\"命盤\"", ...keywords, ...columns.filter((name) => name !== '"KEY"')];
+  const tables = Object.keys(state.metadata?.tables ?? { 命盤: state.metadata?.columns ?? [] });
+  const tableNames = tables.map((name) => `"${name.replaceAll('"', '""')}"`);
+  const columns = [...new Set(Object.values(state.metadata?.tables ?? { 命盤: state.metadata?.columns ?? [] }).flat().map(({ name }) => `"${name.replaceAll('"', '""')}"`))];
+  return ["\"KEY\"", ...tableNames, ...keywords, ...columns.filter((name) => name !== '"KEY"')];
 }
 
 function updateAutocomplete(force = false) {
@@ -250,8 +252,9 @@ async function boot() {
   renderLineNumbers();
   try {
     state.metadata = await call("init");
-    el("#connectionState").textContent = `SQLite · ${state.metadata.table}`;
-    el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} rows · ${state.metadata.columns.length} columns`;
+    const tableCount = Object.keys(state.metadata.tables ?? { [state.metadata.table]: state.metadata.columns }).length;
+    el("#connectionState").textContent = `SQLite · ${tableCount} tables`;
+    el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} rows · ${state.metadata.columns.length} raw columns`;
     el("#runSql").disabled = false;
     await executeSql();
   } catch (error) {

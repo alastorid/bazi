@@ -909,6 +909,58 @@ ORDER BY "旺父母分" DESC,
 FROM "命盤"
 ORDER BY "綜合SSR分" DESC,
          "公曆日期", "時辰序號", "性別";`,
+  ranking_top: `SELECT TOP 100
+  m."KEY", m."命盤連結", m."性別", m."命宮主星",
+  r."財富分", r."財富排名", r."財富百分位",
+  r."幸運分", r."幸運排名", r."幸運百分位",
+  r."外貌分", r."外貌排名", r."外貌百分位",
+  r."事業分", r."事業排名", r."社交分", r."社交排名",
+  r."家庭助力分", r."家庭助力排名", r."福體分", r."福體排名",
+  r."綜合分", r."綜合排名", r."綜合百分位"
+FROM "命盤評分" r
+JOIN "命盤" m ON m."KEY" = r."KEY"
+ORDER BY r."綜合分" DESC, m."KEY";`,
+  ranking_elite: `SELECT TOP 1000
+  m."KEY", m."命盤連結", m."性別", m."命宮主星",
+  r."財富分", r."財富排名", r."幸運分", r."幸運排名",
+  r."外貌分", r."外貌排名", r."綜合分", r."綜合排名"
+FROM "命盤評分" r
+JOIN "命盤" m ON m."KEY" = r."KEY"
+WHERE r."財富排名" IN ('SSS', 'SSR')
+  AND r."幸運排名" IN ('SSS', 'SSR')
+  AND r."外貌排名" IN ('SSS', 'SSR')
+ORDER BY r."綜合分" DESC, m."KEY";`,
+  ranking_balanced: `SELECT TOP 1000
+  m."KEY", m."命盤連結", m."性別", m."命宮主星",
+  r."財富百分位", r."幸運百分位", r."外貌百分位", r."事業百分位",
+  r."社交百分位", r."家庭助力百分位", r."福體百分位",
+  r."綜合分", r."綜合排名", r."綜合百分位"
+FROM "命盤評分" r
+JOIN "命盤" m ON m."KEY" = r."KEY"
+WHERE r."財富百分位" >= 80 AND r."幸運百分位" >= 80
+  AND r."事業百分位" >= 80 AND r."家庭助力百分位" >= 80
+  AND r."福體百分位" >= 80
+ORDER BY r."綜合分" DESC, m."KEY";`,
+  ranking_dimensions: `SELECT TOP 1000
+  "KEY", "財富分", "財富排名", "財富百分位",
+  "幸運分", "幸運排名", "幸運百分位",
+  "外貌分", "外貌排名", "外貌百分位",
+  "事業分", "事業排名", "事業百分位",
+  "社交分", "社交排名", "社交百分位",
+  "家庭助力分", "家庭助力排名", "家庭助力百分位",
+  "福體分", "福體排名", "福體百分位",
+  "綜合分", "綜合排名", "綜合百分位"
+FROM "命盤評分"
+ORDER BY "綜合分" DESC, "KEY";`,
+  ranking_distribution: `SELECT
+  "綜合排名", COUNT(*) AS "盤數",
+  ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM "命盤評分"), 2) AS "占比"
+FROM "命盤評分"
+GROUP BY "綜合排名"
+ORDER BY CASE "綜合排名"
+  WHEN 'SSS' THEN 1 WHEN 'SSR' THEN 2 WHEN 'SS' THEN 3 WHEN 'S' THEN 4
+  WHEN 'A' THEN 5 WHEN 'B' THEN 6 WHEN 'C' THEN 7 WHEN 'D' THEN 8
+  WHEN 'E' THEN 9 ELSE 10 END;`,
   // ============================================================
   // 🔍 基礎 / Debug / Exploration
   // ============================================================
@@ -992,6 +1044,13 @@ const QUERY_GROUPS = {
     "ssr_noble",
     "ultimate_score",
   ],
+  "📊 全年排名": [
+    "ranking_top",
+    "ranking_elite",
+    "ranking_balanced",
+    "ranking_dimensions",
+    "ranking_distribution",
+  ],
   "💰 財富": [
     "sr_income",
     "sr_super_income",
@@ -1064,6 +1123,11 @@ const QUERY_LABELS = {
   "ssr_all": "綜合 SSR",
   "ssr_noble": "紫府武相權貴",
   "ultimate_score": "綜合評分",
+  "ranking_top": "綜合排名 TOP 100",
+  "ranking_elite": "財富幸運外貌雙R以上",
+  "ranking_balanced": "五維前20%均衡盤",
+  "ranking_dimensions": "完整八維評分",
+  "ranking_distribution": "綜合排名分布",
   "sr_income": "超強正財",
   "sr_super_income": "頂級正財",
   "sr_asset": "資產型巨富",
@@ -1115,7 +1179,6 @@ window.BAZI_QUERY_LIBRARY = Object.freeze({
   queries: Object.freeze(SAMPLE_QUERIES),
   groups: Object.freeze(QUERY_GROUPS),
   labels: Object.freeze(QUERY_LABELS),
-  defaultQuery: "ssr_all",
+  defaultQuery: "ranking_top",
 });
 })();
-
