@@ -1,0 +1,826 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-04T17:10:23.037Z",
+  "algorithm": "ziwei-doushu/lib/ziwei/algorithm.ts (iztro bySolar, zh-TW)",
+  "year": 2027,
+  "rowCount": 8760,
+  "keyFormat": "YYYYMMDD-時辰-性別",
+  "table": "命盤",
+  "sqlite": "data/ziwei-2027.sqlite.gz",
+  "hash": "bc636f893241a60cb402165d033bb79575a5b06ced38eaaa962b0c532785fa59",
+  "uncompressedBytes": 19304448,
+  "compressedBytes": 1817323,
+  "columns": [
+    {
+      "name": "KEY",
+      "type": "TEXT"
+    },
+    {
+      "name": "公曆日期",
+      "type": "TEXT"
+    },
+    {
+      "name": "年",
+      "type": "INTEGER"
+    },
+    {
+      "name": "月",
+      "type": "INTEGER"
+    },
+    {
+      "name": "日",
+      "type": "INTEGER"
+    },
+    {
+      "name": "時辰",
+      "type": "TEXT"
+    },
+    {
+      "name": "時辰序號",
+      "type": "INTEGER"
+    },
+    {
+      "name": "性別",
+      "type": "TEXT"
+    },
+    {
+      "name": "農曆日期",
+      "type": "TEXT"
+    },
+    {
+      "name": "年干",
+      "type": "TEXT"
+    },
+    {
+      "name": "年支",
+      "type": "TEXT"
+    },
+    {
+      "name": "命宮",
+      "type": "TEXT"
+    },
+    {
+      "name": "身宮",
+      "type": "TEXT"
+    },
+    {
+      "name": "身宮宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "五行局",
+      "type": "TEXT"
+    },
+    {
+      "name": "五行局數",
+      "type": "INTEGER"
+    },
+    {
+      "name": "化祿星",
+      "type": "TEXT"
+    },
+    {
+      "name": "化祿宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "化權星",
+      "type": "TEXT"
+    },
+    {
+      "name": "化權宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "化科星",
+      "type": "TEXT"
+    },
+    {
+      "name": "化科宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "化忌星",
+      "type": "TEXT"
+    },
+    {
+      "name": "化忌宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "七殺星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "七殺宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "八座星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "八座宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "三台星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "三台宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天才星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天才宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天月星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天月宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天刑星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天刑宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天同星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天同宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天巫星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天巫宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天使星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天使宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天官星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天官宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天府星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天府宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天空星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天空宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天姚星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天姚宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天相星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天相宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天哭星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天哭宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天馬星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天馬宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天梁星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天梁宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天喜星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天喜宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天虛星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天虛宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天貴星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天貴宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天傷星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天傷宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天鉞星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天鉞宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天壽星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天壽宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天福星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天福宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天魁星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天魁宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天廚星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天廚宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天德星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天德宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "天機星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "天機宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "太陰星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "太陰宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "太陽星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "太陽宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "文曲星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "文曲宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "文昌星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "文昌宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "月德星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "月德宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "火星星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "火星宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "台輔星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "台輔宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "右弼星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "右弼宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "左輔星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "左輔宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "巨門星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "巨門宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "地劫星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "地劫宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "地空星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "地空宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "年解星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "年解宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "旬空星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "旬空宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "孤辰星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "孤辰宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "武曲星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "武曲宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "空亡星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "空亡宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "陀羅星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "陀羅宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "咸池星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "咸池宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "封誥星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "封誥宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "紅鸞星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "紅鸞宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "恩光星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "恩光宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "破軍星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "破軍宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "破碎星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "破碎宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "貪狼星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "貪狼宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "陰煞星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "陰煞宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "紫微星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "紫微宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "華蓋星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "華蓋宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "廉貞星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "廉貞宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "祿存星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "祿存宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "解神星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "解神宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "鈴星星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "鈴星宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "寡宿星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "寡宿宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "截路星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "截路宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "蜚廉星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "蜚廉宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "鳳閣星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "鳳閣宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "龍池星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "龍池宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "擎羊星等",
+      "type": "TEXT"
+    },
+    {
+      "name": "擎羊宮位",
+      "type": "TEXT"
+    },
+    {
+      "name": "命宮主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "命宮全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "兄弟主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "兄弟全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "夫妻主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "夫妻全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "子女主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "子女全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "財帛主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "財帛全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "疾厄主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "疾厄全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "遷移主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "遷移全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "僕役主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "僕役全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "官祿主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "官祿全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "田宅主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "田宅全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "福德主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "福德全部星",
+      "type": "TEXT"
+    },
+    {
+      "name": "父母主星",
+      "type": "TEXT"
+    },
+    {
+      "name": "父母全部星",
+      "type": "TEXT"
+    }
+  ],
+  "stars": [
+    "七殺",
+    "八座",
+    "三台",
+    "天才",
+    "天月",
+    "天刑",
+    "天同",
+    "天巫",
+    "天使",
+    "天官",
+    "天府",
+    "天空",
+    "天姚",
+    "天相",
+    "天哭",
+    "天馬",
+    "天梁",
+    "天喜",
+    "天虛",
+    "天貴",
+    "天傷",
+    "天鉞",
+    "天壽",
+    "天福",
+    "天魁",
+    "天廚",
+    "天德",
+    "天機",
+    "太陰",
+    "太陽",
+    "文曲",
+    "文昌",
+    "月德",
+    "火星",
+    "台輔",
+    "右弼",
+    "左輔",
+    "巨門",
+    "地劫",
+    "地空",
+    "年解",
+    "旬空",
+    "孤辰",
+    "武曲",
+    "空亡",
+    "陀羅",
+    "咸池",
+    "封誥",
+    "紅鸞",
+    "恩光",
+    "破軍",
+    "破碎",
+    "貪狼",
+    "陰煞",
+    "紫微",
+    "華蓋",
+    "廉貞",
+    "祿存",
+    "解神",
+    "鈴星",
+    "寡宿",
+    "截路",
+    "蜚廉",
+    "鳳閣",
+    "龍池",
+    "擎羊"
+  ],
+  "palaces": [
+    "命宮",
+    "兄弟",
+    "夫妻",
+    "子女",
+    "財帛",
+    "疾厄",
+    "遷移",
+    "僕役",
+    "官祿",
+    "田宅",
+    "福德",
+    "父母"
+  ],
+  "brightness": [
+    "廟",
+    "旺",
+    "得",
+    "利",
+    "平",
+    "不",
+    "陷"
+  ]
+}

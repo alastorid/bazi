@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="2027 紫微斗數限定時間範圍反查，支援星等、四化與 Web SQL。" />
+    <title>紫微限定反查 · Web SQL Terminal</title>
+    <link rel="stylesheet" href="terminal.css?v=1" />
+  </head>
+  <body>
+    <header class="terminal-top">
+      <strong id="siteBrand">ZIWEI</strong>
+      <span class="subtitle">限定時間範圍反查</span>
+      <span id="perfBadge">SQLite WASM</span>
+      <button class="theme-button" id="themeToggle" type="button" title="切換明暗模式">☾</button>
+    </header>
+
+    <main class="terminal-shell">
+      <aside class="filter-rail">
+        <div class="rail-head">
+          <p class="eyebrow">FILTER BUILDER</p>
+          <h1>命盤條件</h1>
+          <p id="datasetMeta" class="muted">載入資料中…</p>
+        </div>
+
+        <div class="filter-row">
+          <label>日期起<input id="dateFrom" type="date" /></label>
+          <label>日期迄<input id="dateTo" type="date" /></label>
+        </div>
+        <div class="filter-row">
+          <label>性別<select id="gender"><option value="">全部</option><option>男</option><option>女</option></select></label>
+          <label>時辰<select id="hour"><option value="">全部</option></select></label>
+        </div>
+        <div class="filter-row">
+          <label>命宮<select id="soul"><option value="">全部</option></select></label>
+          <label>身宮<select id="body"><option value="">全部</option></select></label>
+        </div>
+
+        <fieldset>
+          <legend>四化宮位</legend>
+          <div class="filter-row sihua-grid">
+            <label><span class="hua lu">祿</span><select id="huaLu"><option value="">全部</option></select></label>
+            <label><span class="hua quan">權</span><select id="huaQuan"><option value="">全部</option></select></label>
+            <label><span class="hua ke">科</span><select id="huaKe"><option value="">全部</option></select></label>
+            <label><span class="hua ji">忌</span><select id="huaJi"><option value="">全部</option></select></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>星曜條件 <button id="addStarFilter" class="tiny" type="button">＋新增</button></legend>
+          <div id="starFilters"></div>
+        </fieldset>
+
+        <div class="rail-actions">
+          <button id="resetFilters" type="button">重設</button>
+          <button id="runFilters" class="primary" type="button">執行反查</button>
+        </div>
+        <p class="source-note">每筆一張命盤，KEY = 日期＋時辰＋性別。排盤源自 ziwei-doushu 的 iztro 演算法。結果僅供研究。</p>
+      </aside>
+
+      <section class="grid-stage">
+        <div class="mode-tabs">
+          <button class="tab active" data-tab="results" type="button">結果</button>
+          <button class="tab" data-tab="sql" type="button">Web SQL</button>
+          <span id="resultMeta">--</span>
+          <div class="toolbar-actions">
+            <button id="showSchema" type="button">Schema</button>
+            <button id="exportCsv" type="button">CSV</button>
+          </div>
+        </div>
+        <div id="resultsPane" class="pane active">
+          <div class="data-grid" id="gridWrap">
+            <table><thead id="gridHead"></thead><tbody id="gridRows"></tbody></table>
+          </div>
+        </div>
+        <div id="sqlPane" class="pane sql-pane">
+          <div class="sql-toolbar">
+            <span>唯讀 SQLite · ⌘/Ctrl + Enter 執行 · 最多顯示 1,000 筆</span>
+            <button id="formatSql" type="button">範例</button>
+            <button id="runSql" class="primary" type="button">Run SQL</button>
+          </div>
+          <textarea id="sqlEditor" spellcheck="false" aria-label="SQL editor">SELECT
+  "KEY", "命宮", "身宮", "化祿星", "化祿宮位",
+  "化權星", "化權宮位", "化科星", "化科宮位",
+  "化忌星", "化忌宮位"
+FROM "命盤"
+WHERE "紫微星等" IN ('廟', '旺')
+ORDER BY "公曆日期", "時辰序號", "性別";</textarea>
+          <div class="sql-help">
+            <code>SELECT * FROM "命盤" WHERE "太陽星等" = '旺' AND "化祿宮位" = '財帛';</code>
+          </div>
+        </div>
+      </section>
+
+      <aside class="detail-panel">
+        <p class="eyebrow">ROW DETAIL</p>
+        <h2 id="detailTitle">選取一筆命盤</h2>
+        <div id="detailBody" class="empty-note">點擊結果列查看十二宮與星曜。</div>
+      </aside>
+    </main>
+
+    <dialog id="schemaDialog">
+      <header><strong>命盤 Schema</strong><button id="closeSchema" type="button">×</button></header>
+      <input id="schemaSearch" type="search" placeholder="搜尋欄位，例如 紫微、宮位、主星" />
+      <div id="schemaList"></div>
+    </dialog>
+
+    <div class="load-status-bar" id="loadStatusBar" aria-live="polite">
+      <span id="loadStatusText">載入 SQLite WASM…</span>
+      <span class="load-status-track"><span class="load-status-fill" id="loadStatusFill"></span></span>
+    </div>
+    <script src="terminal.js?v=1" defer></script>
+  </body>
+</html>
