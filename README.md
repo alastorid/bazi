@@ -13,8 +13,8 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - Twelve palace-specific decadal range columns (`命宮大限` through `父母大限`).
 - Four transformation star/palace pairs: `化祿`, `化權`, `化科`, `化忌`.
 - Direct columns for `命宮`, `身宮`, and `身宮宮位`.
-- A separate `命盤評分` table with eight score, rank, and percentile triplets.
-- Data-driven `評分規則`, `評分維度`, and `排名門檻` configuration tables. See [SCORING.md](SCORING.md).
+- A separate `命盤評分` table with nine score, rank, and percentile triplets, including `橫財` separately from durable `財富`.
+- Data-driven `評分規則`, `評分維度`, and `排名門檻` configuration tables, plus the query-friendly `命盤完整評分` view. See [SCORING.md](SCORING.md).
 
 The chart generator is a batch-oriented port of `ziwei-doushu/lib/ziwei/algorithm.ts`. It uses the same `iztro` `astro.bySolar` call and `lunar-javascript`; exact traditional Chinese brightness labels are retained for filtering.
 

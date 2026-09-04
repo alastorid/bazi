@@ -13,6 +13,7 @@ if (!year || !/^\d{4}$/.test(year)) {
 for (const [script, args] of [
   ["scripts/generate-data.mjs", [year]],
   ["scripts/verify-data.mjs", []],
+  ["scripts/verify-queries.mjs", []],
   ["scripts/prepare-pages.mjs", [year]],
 ]) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...args], {

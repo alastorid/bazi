@@ -14,7 +14,7 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]);
 
-const { queries: SAMPLE_QUERIES, groups: QUERY_GROUPS, labels: QUERY_LABELS, defaultQuery: DEFAULT_QUERY } = window.BAZI_QUERY_LIBRARY;
+const { queries: SAMPLE_QUERIES, groups: QUERY_GROUPS, labels: QUERY_LABELS, metadata: QUERY_METADATA, defaultQuery: DEFAULT_QUERY } = window.BAZI_QUERY_LIBRARY;
 
 function call(type, payload = {}) {
   const id = nextId++;
@@ -44,11 +44,16 @@ function renderQueryLibrary(filter = "") {
   const needle = filter.trim().toLocaleLowerCase("zh-Hant");
   const groups = Object.entries(QUERY_GROUPS).map(([group, keys]) => {
     const matches = keys.filter((key) => {
-      const haystack = `${group} ${key} ${QUERY_LABELS[key] ?? key}`.toLocaleLowerCase("zh-Hant");
+      const meta = QUERY_METADATA[key] ?? {};
+      const haystack = `${group} ${key} ${QUERY_LABELS[key] ?? key} ${meta.description ?? ""} ${meta.rankTarget ?? ""}`.toLocaleLowerCase("zh-Hant");
       return !needle || haystack.includes(needle);
     });
     if (!matches.length) return "";
-    const buttons = matches.map((key) => `<button type="button" data-sample="${escapeHtml(key)}" class="${key === state.activeQuery ? "active" : ""}" title="${escapeHtml(key)}">${escapeHtml(QUERY_LABELS[key] ?? key)}</button>`).join("");
+    const buttons = matches.map((key) => {
+      const meta = QUERY_METADATA[key] ?? {};
+      const title = [key, meta.description, meta.rankTarget ? `Rank: ${meta.rankTarget}` : ""].filter(Boolean).join(" · ");
+      return `<button type="button" data-sample="${escapeHtml(key)}" class="${key === state.activeQuery ? "active" : ""}" title="${escapeHtml(title)}">${escapeHtml(QUERY_LABELS[key] ?? key)}</button>`;
+    }).join("");
     const open = needle || matches.includes(state.activeQuery) ? " open" : "";
     return `<details${open}><summary>${escapeHtml(group)} <small>${matches.length}</small></summary>${buttons}</details>`;
   }).join("");

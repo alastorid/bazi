@@ -1,7 +1,11 @@
-export const DIMENSIONS = ["財富", "幸運", "外貌", "事業", "社交", "家庭助力", "福體"];
+// 橫財 is deliberately separate from 財富: sudden upside and durable wealth
+// are not the same signal. A zero overallWeight makes it an analytical
+// sub-score without double-counting it in 綜合分.
+export const DIMENSIONS = ["財富", "橫財", "幸運", "外貌", "事業", "社交", "家庭助力", "福體"];
 
 export const DIMENSION_CONFIG = {
   財富: { baseScore: 50, overallWeight: 0.20 },
+  橫財: { baseScore: 35, overallWeight: 0 },
   幸運: { baseScore: 50, overallWeight: 0.14 },
   外貌: { baseScore: 50, overallWeight: 0.10 },
   事業: { baseScore: 50, overallWeight: 0.17 },
@@ -37,6 +41,18 @@ export const SCORE_RULES = [
   rule("W08", "財富", "扣分", -20, `m."化忌宮位" IN ('財帛','官祿','田宅')`, "化忌損及財官田"),
   rule("W09", "財富", "扣分", -12, anyLike([p("財帛"), p("田宅")], ["地空","地劫"]), "財帛田宅受空劫影響"),
   rule("W10", "財富", "扣分", -7, anyLike([p("財帛"), p("官祿")], ["擎羊","陀羅","火星","鈴星"]), "財官見主要煞曜增加波動"),
+
+  rule("G01", "橫財", "加分", 5, `m."貪狼宮位"='財帛'`, "貪狼在財帛，具機會財與商業財訊號"),
+  rule("G02", "橫財", "加分", 5, `(m."貪狼宮位"='財帛' AND m."貪狼星等" IN ('廟','旺'))`, "貪狼廟旺坐財帛"),
+  rule("G03", "橫財", "組合", 18, `(m."貪狼宮位"='財帛' AND m."財帛全部星" LIKE '%火星%')`, "火星與貪狼同在財帛形成火貪"),
+  rule("G04", "橫財", "組合", 16, `(m."貪狼宮位"='財帛' AND m."財帛全部星" LIKE '%鈴星%')`, "鈴星與貪狼同在財帛形成鈴貪"),
+  rule("G05", "橫財", "組合", 10, `(m."貪狼宮位"='財帛' AND ${anyLike([p("財帛")], ["火星","鈴星"])} AND m."化祿宮位"='財帛')`, "火鈴貪同財帛再得化祿"),
+  rule("G06", "橫財", "組合", 8, `(m."貪狼宮位"='財帛' AND ${anyLike([p("財帛")], ["火星","鈴星"])} AND m."財帛全部星" LIKE '%祿存%')`, "火鈴貪同財帛再得祿存"),
+  rule("G07", "橫財", "組合", 8, `(m."貪狼宮位"='財帛' AND m."貪狼星等" IN ('廟','旺') AND ${anyLike([p("財帛")], ["火星","鈴星"])} AND m."化祿宮位"='財帛')`, "火鈴貪化祿且貪狼廟旺"),
+  rule("G08", "橫財", "加分", 8, `((m."破軍宮位" IN ('財帛','官祿','遷移') AND m."破軍星等" IN ('廟','旺')) OR (m."七殺宮位" IN ('財帛','官祿','遷移') AND m."七殺星等" IN ('廟','旺')))`, "破軍或七殺得地於財官遷"),
+  rule("G09", "橫財", "組合", 10, `(m."化祿宮位" IN ('財帛','官祿','遷移') AND m."化權宮位" IN ('財帛','官祿','遷移'))`, "祿權同時引動財官遷"),
+  rule("G10", "橫財", "扣分", -18, anyLike([p("財帛")], ["地空","地劫"]), "財帛空劫使爆發財大起大落"),
+  rule("G11", "橫財", "扣分", -15, `(m."化忌宮位"='財帛' AND ${anyLike([p("財帛")], ["擎羊","陀羅","火星","鈴星","地空","地劫"])})`, "財帛化忌又受煞，得失反覆"),
 
   rule("L01", "幸運", "加分", 12, `m."化祿宮位" IN ('命宮','福德','遷移','父母')`, "化祿進命福遷父"),
   rule("L02", "幸運", "加分", 9, `m."化科宮位" IN ('命宮','福德','遷移','父母')`, "化科帶來順遂與解厄"),
@@ -112,6 +128,7 @@ export function scoringColumns() {
 }
 
 export function buildScoringTables(db) {
+  db.run('DROP VIEW IF EXISTS "命盤完整評分"');
   db.run('DROP TABLE IF EXISTS "命盤評分"');
   db.run('DROP TABLE IF EXISTS "評分規則"');
   db.run('DROP TABLE IF EXISTS "評分維度"');
@@ -133,9 +150,9 @@ export function buildScoringTables(db) {
     const terms = SCORE_RULES.filter((item) => item.dimension === dimension).map((item) => `CASE WHEN ${item.condition} THEN ${item.weight} ELSE 0 END`);
     return `${clamp(`${DIMENSION_CONFIG[dimension].baseScore} + ${terms.join(" + ")}`)} AS "${dimension}分"`;
   });
-  db.run(`CREATE TEMP TABLE "_七維分數" AS SELECT m."KEY", ${dimensionScores.join(", ")} FROM "命盤" m`);
+  db.run(`CREATE TEMP TABLE "_維度分數" AS SELECT m."KEY", ${dimensionScores.join(", ")} FROM "命盤" m`);
   const overall = DIMENSIONS.map((dimension) => `"${dimension}分" * ${DIMENSION_CONFIG[dimension].overallWeight}`).join(" + ");
-  db.run(`CREATE TEMP TABLE "_全部分數" AS SELECT *, ROUND(${overall}, 2) AS "綜合分" FROM "_七維分數"`);
+  db.run(`CREATE TEMP TABLE "_全部分數" AS SELECT *, ROUND(${overall}, 2) AS "綜合分" FROM "_維度分數"`);
   const allDimensions = [...DIMENSIONS, "綜合"];
   const percentiles = allDimensions.map((dimension) => `ROUND(PERCENT_RANK() OVER (ORDER BY "${dimension}分" ASC) * 100, 2) AS "${dimension}百分位"`);
   db.run(`CREATE TEMP TABLE "_含百分位" AS SELECT *, ${percentiles.join(", ")} FROM "_全部分數"`);
@@ -145,7 +162,9 @@ export function buildScoringTables(db) {
   const values = allDimensions.flatMap((dimension) => [`"${dimension}分"`, `${rankCase(dimension)} AS "${dimension}排名"`, `"${dimension}百分位"`]);
   db.run(`INSERT INTO "命盤評分" SELECT "KEY", ${values.join(", ")} FROM "_含百分位"`);
   for (const dimension of allDimensions) db.run(`CREATE INDEX "idx_評分_${dimension}" ON "命盤評分"("${dimension}排名", "${dimension}分" DESC)`);
-  db.run('DROP TABLE "_七維分數"');
+  db.run('DROP TABLE "_維度分數"');
   db.run('DROP TABLE "_全部分數"');
   db.run('DROP TABLE "_含百分位"');
+  const scoreProjection = scoringColumns().map(({ name }) => `r."${name}"`).join(", ");
+  db.run(`CREATE VIEW "命盤完整評分" AS SELECT m.*, ${scoreProjection} FROM "命盤" m JOIN "命盤評分" r ON r."KEY" = m."KEY"`);
 }

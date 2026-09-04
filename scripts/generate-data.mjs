@@ -136,7 +136,7 @@ for (const date of dates) {
 }
 db.run("COMMIT");
 insert.free();
-console.log(`Scoring ${rowCount.toLocaleString()} charts across 8 dimensions…`);
+console.log(`Scoring ${rowCount.toLocaleString()} charts across ${Object.keys(DIMENSION_CONFIG).length} dimensions…`);
 buildScoringTables(db);
 
 const bytes = Buffer.from(db.export());
@@ -156,6 +156,7 @@ const metadata = {
   tables: {
     命盤: columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })),
     命盤評分: [{ name: "KEY", type: "TEXT" }, ...scoringColumns()],
+    命盤完整評分: [...columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })), ...scoringColumns()],
     評分規則: ["規則ID", "維度", "類型", "權重", "條件SQL", "說明"].map((name) => ({ name, type: name === "權重" ? "REAL" : "TEXT" })),
     評分維度: [{ name: "維度", type: "TEXT" }, { name: "基礎分", type: "REAL" }, { name: "綜合權重", type: "REAL" }],
     排名門檻: [{ name: "排名", type: "TEXT" }, { name: "最低百分位", type: "REAL" }],

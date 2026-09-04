@@ -15,7 +15,7 @@ const rows = (sql) => {
 };
 const count = rows('SELECT COUNT(*) AS n, COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if (count.n !== metadata.rowCount || count.keys !== metadata.rowCount) throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
-const dimensions = ["財富", "幸運", "外貌", "事業", "社交", "家庭助力", "福體", "綜合"];
+const dimensions = ["財富", "橫財", "幸運", "外貌", "事業", "社交", "家庭助力", "福體", "綜合"];
 const scoreCount = rows('SELECT COUNT(*) AS n, COUNT(DISTINCT "KEY") AS keys FROM "命盤評分"')[0];
 if (scoreCount.n !== metadata.rowCount || scoreCount.keys !== metadata.rowCount) throw new Error(`score row/key mismatch: ${JSON.stringify(scoreCount)}`);
 for (const dimension of dimensions) {
@@ -28,6 +28,10 @@ const storedRules = rows('SELECT COUNT(*) AS n FROM "評分規則"')[0].n;
 if (storedRules !== metadata.scoring.rules) throw new Error(`score rule mismatch: ${storedRules}/${metadata.scoring.rules}`);
 const overallWeight = rows('SELECT ROUND(SUM("綜合權重"), 6) AS n FROM "評分維度"')[0].n;
 if (overallWeight !== 1) throw new Error(`overall score weights must total 1, got ${overallWeight}`);
+const viewCount = rows('SELECT COUNT(*) AS n FROM "命盤完整評分"')[0].n;
+if (viewCount !== metadata.rowCount) throw new Error(`complete score view row mismatch: ${viewCount}`);
+const falseFireGreed = rows(`SELECT COUNT(*) AS n FROM "命盤完整評分" WHERE "貪狼宮位" <> '財帛' AND "財帛全部星" LIKE '%火星%' AND "橫財分" >= 70`)[0].n;
+if (falseFireGreed) throw new Error(`unrelated fire-star charts received fire-greed score: ${falseFireGreed}`);
 const missing = rows('SELECT COUNT(*) AS n FROM "命盤" WHERE "化祿宮位" = \'\' OR "化權宮位" = \'\' OR "化科宮位" = \'\' OR "化忌宮位" = \'\' OR "命宮" = \'\' OR "身宮" = \'\'')[0].n;
 if (missing) throw new Error(`${missing} rows have missing required palace fields`);
 const invalidLinks = rows(`SELECT COUNT(*) AS n FROM "命盤" WHERE "命盤連結" NOT LIKE 'https://metisziwei.com/chart?y=${metadata.year}&m=%&d=%&h=%&mi=0&g=%'`)[0].n;
