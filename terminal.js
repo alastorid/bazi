@@ -5,7 +5,7 @@ const state = {
   suggestionIndex: 0,
 };
 
-const worker = new Worker("sqlWorker.js?v=6");
+const worker = new Worker("sqlWorker.js?v=7");
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
