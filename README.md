@@ -13,8 +13,9 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - Twelve palace-specific decadal range columns (`命宮大限` through `父母大限`).
 - Four transformation star/palace pairs: `化祿`, `化權`, `化科`, `化忌`.
 - Direct columns for `命宮`, `身宮`, and `身宮宮位`.
-- A separate `命盤評分` table with nine score, rank, and percentile triplets, including `橫財` separately from durable `財富`.
-- Data-driven `評分規則`, `評分維度`, and `排名門檻` configuration tables, plus the query-friendly `命盤完整評分` view. See [SCORING.md](SCORING.md).
+- First-class 空宮 data for every palace: empty flag, opposite palace and stars, effective borrowed stars, and provenance.
+- `空宮數` for direct multi-empty-palace research. See [PALACE_SEMANTICS.md](PALACE_SEMANTICS.md).
+- No generalized point scores, percentiles, or SSS/SSR grades. Named patterns are expressed as explicit, inspectable Zi Wei conditions.
 
 The chart generator is a batch-oriented port of `ziwei-doushu/lib/ziwei/algorithm.ts`. It uses the same `iztro` `astro.bySolar` call and `lunar-javascript`; exact traditional Chinese brightness labels are retained for filtering.
 
@@ -28,7 +29,7 @@ npm run serve
 
 Serve `dist/` through an HTTP server. Do not open `index.html` directly because SQLite WASM and the database are fetched by a Web Worker.
 
-`build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮 and 身宮.
+`build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮／身宮, all 12 opposite-palace mappings, empty-palace borrowing, and every sample query.
 
 ## Generate another year
 

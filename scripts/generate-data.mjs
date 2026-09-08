@@ -5,7 +5,6 @@ import crypto from "node:crypto";
 import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { generateChart, HOURS, GENDERS } from "../src/ziwei-algorithm.mjs";
-import { buildScoringTables, scoringColumns, SCORE_RULES, RANK_THRESHOLDS, DIMENSION_CONFIG } from "../src/scoring-model.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const year = Number(process.argv[2] || new Date().getFullYear() + 1);
@@ -53,6 +52,26 @@ const palaces = [...palaceNames].sort((a, b) => {
   return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || a.localeCompare(b, "zh-Hant");
 });
 
+// User-facing palace semantics. iztro calls 交友宮「僕役」in the raw chart;
+// keep that original column while exposing the conventional 交友宮 name in
+// every new semantic field.
+const friendPalace = palaces.includes("交友") ? "交友" : "僕役";
+const palaceSpecs = [
+  { label: "命宮", raw: "命宮", opposite: "遷移宮" },
+  { label: "兄弟宮", raw: "兄弟", opposite: "交友宮" },
+  { label: "夫妻宮", raw: "夫妻", opposite: "官祿宮" },
+  { label: "子女宮", raw: "子女", opposite: "田宅宮" },
+  { label: "財帛宮", raw: "財帛", opposite: "福德宮" },
+  { label: "疾厄宮", raw: "疾厄", opposite: "父母宮" },
+  { label: "遷移宮", raw: "遷移", opposite: "命宮" },
+  { label: "交友宮", raw: friendPalace, opposite: "兄弟宮" },
+  { label: "官祿宮", raw: "官祿", opposite: "夫妻宮" },
+  { label: "田宅宮", raw: "田宅", opposite: "子女宮" },
+  { label: "福德宮", raw: "福德", opposite: "財帛宮" },
+  { label: "父母宮", raw: "父母", opposite: "疾厄宮" },
+];
+const specByLabel = new Map(palaceSpecs.map((spec) => [spec.label, spec]));
+
 const baseColumns = [
   ["KEY", "TEXT PRIMARY KEY"], ["公曆日期", "TEXT NOT NULL"], ["年", "INTEGER NOT NULL"],
   ["月", "INTEGER NOT NULL"], ["日", "INTEGER NOT NULL"], ["時辰", "TEXT NOT NULL"],
@@ -70,13 +89,26 @@ const palaceColumns = palaces.flatMap((palace) => [
   [`${palace}全部星`, "TEXT"],
   [`${palace}大限`, "TEXT"],
 ]);
-const columns = [...baseColumns, ...starColumns, ...palaceColumns];
+const semanticColumns = palaceSpecs.flatMap(({ label }) => [
+  [`${label}是否空宮`, "INTEGER NOT NULL"],
+  [`${label}對宮`, "TEXT NOT NULL"],
+  [`${label}對宮主星`, "TEXT NOT NULL"],
+  [`${label}對宮全部星`, "TEXT NOT NULL"],
+  [`真${label}`, "TEXT NOT NULL"],
+  [`真${label}主星`, "TEXT NOT NULL"],
+  [`真${label}全部星`, "TEXT NOT NULL"],
+  [`真${label}來源`, "TEXT NOT NULL"],
+]);
+const columns = [...baseColumns, ...starColumns, ...palaceColumns, ...semanticColumns, ["空宮數", "INTEGER NOT NULL"]];
 
 const SQL = await initSqlJs({ locateFile: (file) => path.join(sqlDist, file) });
 const db = new SQL.Database();
 db.run(`CREATE TABLE 命盤 (${columns.map(([name, type]) => `${quoteIdent(name)} ${type}`).join(", ")})`);
 db.run('CREATE INDEX "idx_日期性別" ON "命盤"("公曆日期", "性別", "時辰序號")');
 for (const name of ["化祿宮位", "化權宮位", "化科宮位", "化忌宮位", "命宮", "身宮"]) {
+  db.run(`CREATE INDEX ${quoteIdent(`idx_${name}`)} ON "命盤"(${quoteIdent(name)})`);
+}
+for (const name of ["空宮數", "命宮是否空宮", "父母宮是否空宮"]) {
   db.run(`CREATE INDEX ${quoteIdent(`idx_${name}`)} ON "命盤"(${quoteIdent(name)})`);
 }
 
@@ -125,6 +157,27 @@ for (const date of dates) {
         values[`${palaceName}全部星`] = palace?.stars.map((star) => `${star.name}${star.siHua ? `化${star.siHua}` : ""}${star.brightness ? `(${star.brightness})` : ""}`).join("、") ?? "";
         values[`${palaceName}大限`] = palace?.daXianRange?.length === 2 ? `${palace.daXianRange[0]}-${palace.daXianRange[1]}` : "";
       }
+      let emptyCount = 0;
+      for (const spec of palaceSpecs) {
+        const opposite = specByLabel.get(spec.opposite);
+        const ownMain = values[`${spec.raw}主星`] ?? "";
+        const ownAll = values[`${spec.raw}全部星`] ?? "";
+        const oppositeMain = values[`${opposite.raw}主星`] ?? "";
+        const oppositeAll = values[`${opposite.raw}全部星`] ?? "";
+        const isEmpty = ownMain === "" ? 1 : 0;
+        const effectiveMain = isEmpty ? oppositeMain : ownMain;
+        const effectiveAll = isEmpty ? oppositeAll : ownAll;
+        emptyCount += isEmpty;
+        values[`${spec.label}是否空宮`] = isEmpty;
+        values[`${spec.label}對宮`] = spec.opposite;
+        values[`${spec.label}對宮主星`] = oppositeMain;
+        values[`${spec.label}對宮全部星`] = oppositeAll;
+        values[`真${spec.label}`] = effectiveMain;
+        values[`真${spec.label}主星`] = effectiveMain;
+        values[`真${spec.label}全部星`] = effectiveAll;
+        values[`真${spec.label}來源`] = isEmpty ? "借對宮" : "本宮";
+      }
+      values.空宮數 = emptyCount;
       insert.run(columns.map(([name]) => values[name] ?? ""));
       rowCount += 1;
     }
@@ -136,8 +189,6 @@ for (const date of dates) {
 }
 db.run("COMMIT");
 insert.free();
-console.log(`Scoring ${rowCount.toLocaleString()} charts across ${Object.keys(DIMENSION_CONFIG).length} dimensions…`);
-buildScoringTables(db);
 
 const bytes = Buffer.from(db.export());
 db.close();
@@ -155,11 +206,6 @@ const metadata = {
   table: "命盤",
   tables: {
     命盤: columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })),
-    命盤評分: [{ name: "KEY", type: "TEXT" }, ...scoringColumns()],
-    命盤完整評分: [...columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })), ...scoringColumns()],
-    評分規則: ["規則ID", "維度", "類型", "權重", "條件SQL", "說明"].map((name) => ({ name, type: name === "權重" ? "REAL" : "TEXT" })),
-    評分維度: [{ name: "維度", type: "TEXT" }, { name: "基礎分", type: "REAL" }, { name: "綜合權重", type: "REAL" }],
-    排名門檻: [{ name: "排名", type: "TEXT" }, { name: "最低百分位", type: "REAL" }],
   },
   sqlite: `data/ziwei-${year}.sqlite.gz`,
   hash,
@@ -169,7 +215,7 @@ const metadata = {
   stars,
   palaces,
   brightness: ["廟", "旺", "得", "利", "平", "不", "陷"],
-  scoring: { dimensions: [...new Set(scoringColumns().map(({ name }) => name.replace(/(分|排名|百分位)$/, "")))], rules: SCORE_RULES.length, configuration: DIMENSION_CONFIG, thresholds: RANK_THRESHOLDS },
+  palaceSemantics: palaceSpecs,
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
 console.log(JSON.stringify({ year, rowCount, columns: columns.length, stars: stars.length, palaces: palaces.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));

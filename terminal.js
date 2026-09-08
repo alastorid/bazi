@@ -45,13 +45,13 @@ function renderQueryLibrary(filter = "") {
   const groups = Object.entries(QUERY_GROUPS).map(([group, keys]) => {
     const matches = keys.filter((key) => {
       const meta = QUERY_METADATA[key] ?? {};
-      const haystack = `${group} ${key} ${QUERY_LABELS[key] ?? key} ${meta.description ?? ""} ${meta.rankTarget ?? ""}`.toLocaleLowerCase("zh-Hant");
+      const haystack = `${group} ${key} ${QUERY_LABELS[key] ?? key} ${meta.description ?? ""}`.toLocaleLowerCase("zh-Hant");
       return !needle || haystack.includes(needle);
     });
     if (!matches.length) return "";
     const buttons = matches.map((key) => {
       const meta = QUERY_METADATA[key] ?? {};
-      const title = [key, meta.description, meta.rankTarget ? `Rank: ${meta.rankTarget}` : ""].filter(Boolean).join(" · ");
+      const title = [key, meta.description].filter(Boolean).join(" · ");
       return `<button type="button" data-sample="${escapeHtml(key)}" class="${key === state.activeQuery ? "active" : ""}" title="${escapeHtml(title)}">${escapeHtml(QUERY_LABELS[key] ?? key)}</button>`;
     }).join("");
     const open = needle || matches.includes(state.activeQuery) ? " open" : "";
@@ -258,8 +258,8 @@ async function boot() {
   try {
     state.metadata = await call("init");
     const tableCount = Object.keys(state.metadata.tables ?? { [state.metadata.table]: state.metadata.columns }).length;
-    el("#connectionState").textContent = `SQLite · ${tableCount} tables`;
-    el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} rows · ${state.metadata.columns.length} raw columns`;
+    el("#connectionState").textContent = `SQLite · ${tableCount} ${tableCount === 1 ? "table" : "tables"}`;
+    el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} rows · ${state.metadata.columns.length} columns`;
     el("#runSql").disabled = false;
     await executeSql();
   } catch (error) {
