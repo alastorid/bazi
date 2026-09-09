@@ -25,7 +25,7 @@ for (const definition of definitions) {
   if (seen.has(definition.key)) throw new Error(`duplicate sample query key: ${definition.key}`);
   seen.add(definition.key);
   for (const field of ["key","group","label","description","sql"]) if (!definition[field]) throw new Error(`${definition.key} missing metadata field: ${field}`);
-  if (/排名|百分位|綜合分|財富分|幸運分|外貌分|橫財分/.test(definition.sql)) throw new Error(`${definition.key} still references scoring/ranking`);
+  if (!definition.sql.includes('JOIN "命盤評分"')) throw new Error(`${definition.key} does not expose the ranking engine`);
   const result = db.exec(translateTop(definition.sql))[0];
   if (!result) throw new Error(`${definition.key} returned no result set`);
   if (expectedHeader.some((name,index) => result.columns[index] !== name)) throw new Error(`${definition.key} has inconsistent result header`);
@@ -43,5 +43,12 @@ const borrowedFire = count(`SELECT COUNT(*) FROM "命盤" WHERE "財帛宮是否
 const borrowedFireFalsePositive = count(`SELECT COUNT(*) FROM "命盤" WHERE "財帛宮是否空宮"=1 AND "真財帛宮主星" LIKE '%貪狼%' AND "火星宮位"='財帛' AND "貪狼宮位"='財帛'`);
 if (borrowedFireFalsePositive) throw new Error(`${borrowedFireFalsePositive} borrowed 貪狼 charts falsely satisfy strict 火貪`);
 const strictExamples = db.exec(`SELECT "KEY","財帛主星","財帛全部星","貪狼宮位","火星宮位","財帛宮是否空宮","真財帛宮來源" FROM "命盤" WHERE "貪狼宮位"='財帛' AND "火星宮位"='財帛' ORDER BY "KEY" LIMIT 3`)[0];
-console.log(JSON.stringify({ sampleQueries:definitions.length, groups:Object.keys(window.BAZI_QUERY_LIBRARY.groups).length, defaultQuery:window.BAZI_QUERY_LIBRARY.defaultQuery, badFire, badBell, borrowedFireCandidates:borrowedFire, borrowedFireFalsePositive, strictFireExamples:asObjects(strictExamples), representativeKeys:samples }, null, 2));
+if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "overall_top") throw new Error("unexpected default query");
+for (const key of ["wealth_fire_greed","wealth_bell_greed","appearance_bright","health_bright_support","career_bright_leader","career_entrepreneur","social_bright","family_bright"]) {
+  const sql = window.BAZI_QUERY_LIBRARY.queries[key];
+  if (!/星曜亮度|星等/.test(sql)) throw new Error(`${key} does not use brightness`);
+}
+const normalizedRows = count('SELECT COUNT(*) FROM "星曜亮度" WHERE "星曜"=\'貪狼\' AND "宮位"=\'財帛\' AND "亮度序">=(SELECT "亮度序" FROM "亮度等級" WHERE "亮度"=\'旺\')');
+if (!normalizedRows) throw new Error("normalized brightness comparison returned no rows");
+console.log(JSON.stringify({ sampleQueries:definitions.length, groups:Object.keys(window.BAZI_QUERY_LIBRARY.groups).length, defaultQuery:window.BAZI_QUERY_LIBRARY.defaultQuery, badFire, badBell, borrowedFireCandidates:borrowedFire, borrowedFireFalsePositive, normalizedBrightnessRows:normalizedRows, strictFireExamples:asObjects(strictExamples), representativeKeys:samples }, null, 2));
 db.close();

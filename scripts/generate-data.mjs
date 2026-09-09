@@ -5,6 +5,10 @@ import crypto from "node:crypto";
 import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { generateChart, HOURS, GENDERS } from "../src/ziwei-algorithm.mjs";
+import {
+  BRIGHTNESS_LEVELS, CONTEXT_RULES, DIMENSIONS, DIMENSION_CONFIG,
+  RANK_THRESHOLDS, STAR_NATURE, STAR_RULES, scoreChart,
+} from "../src/scoring-model.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const year = Number(process.argv[2] || new Date().getFullYear() + 1);
@@ -31,6 +35,7 @@ function datesOfYear(targetYear) {
 const pad2 = (value) => String(value).padStart(2, "0");
 const quoteIdent = (value) => `"${String(value).replaceAll('"', '""')}"`;
 const dates = datesOfYear(year);
+const brightnessRank = new Map(BRIGHTNESS_LEVELS);
 
 // Every natal chart contains the complete fixed star catalogue, distributed
 // across its twelve palaces. One representative chart is therefore sufficient
@@ -112,7 +117,36 @@ for (const name of ["空宮數", "命宮是否空宮", "父母宮是否空宮"])
   db.run(`CREATE INDEX ${quoteIdent(`idx_${name}`)} ON "命盤"(${quoteIdent(name)})`);
 }
 
+db.run('CREATE TABLE "亮度等級" ("亮度" TEXT PRIMARY KEY, "亮度序" INTEGER UNIQUE NOT NULL)');
+const brightnessLevelInsert = db.prepare('INSERT INTO "亮度等級" VALUES (?, ?)');
+for (const level of BRIGHTNESS_LEVELS) brightnessLevelInsert.run(level);
+brightnessLevelInsert.free();
+db.run('CREATE TABLE "星曜亮度" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "星曜類型" TEXT NOT NULL, "星性質" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER NOT NULL, "四化" TEXT NOT NULL, PRIMARY KEY ("KEY", "星曜"))');
+db.run('CREATE INDEX "idx_星曜亮度_查詢" ON "星曜亮度"("星曜", "宮位", "亮度序", "KEY")');
+
+db.run('CREATE TABLE "評分維度" ("維度" TEXT PRIMARY KEY, "基礎分" REAL NOT NULL, "綜合權重" REAL NOT NULL)');
+const dimensionInsert = db.prepare('INSERT INTO "評分維度" VALUES (?, ?, ?)');
+for (const dimension of DIMENSIONS) dimensionInsert.run([dimension, DIMENSION_CONFIG[dimension].baseScore, DIMENSION_CONFIG[dimension].overallWeight]);
+dimensionInsert.free();
+db.run('CREATE TABLE "排名門檻" ("排名" TEXT PRIMARY KEY, "最低百分位" REAL NOT NULL)');
+const thresholdInsert = db.prepare('INSERT INTO "排名門檻" VALUES (?, ?)');
+for (const threshold of RANK_THRESHOLDS) thresholdInsert.run(threshold);
+thresholdInsert.free();
+db.run('CREATE TABLE "評分規則" ("規則ID" TEXT PRIMARY KEY, "維度" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "適用宮位" TEXT NOT NULL, "基礎作用" REAL, "說明" TEXT NOT NULL)');
+const scoringRuleInsert = db.prepare('INSERT INTO "評分規則" VALUES (?, ?, ?, ?, ?, ?, ?)');
+for (const item of STAR_RULES) scoringRuleInsert.run([item.id, item.dimension, "星曜宮位", item.star, item.palaces.join("、"), item.base, item.description]);
+for (const item of CONTEXT_RULES) scoringRuleInsert.run([item.id, item.dimension, item.type, "", "", null, item.description]);
+scoringRuleInsert.free();
+db.run('CREATE TABLE "命盤評分明細" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "規則ID" TEXT NOT NULL REFERENCES "評分規則"("規則ID"), "維度" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER, "亮度倍率" REAL NOT NULL, "基礎作用" REAL NOT NULL, "實際貢獻" REAL NOT NULL, "說明" TEXT NOT NULL)');
+db.run('CREATE INDEX "idx_評分明細_KEY" ON "命盤評分明細"("KEY", "維度")');
+db.run('CREATE INDEX "idx_評分明細_星曜" ON "命盤評分明細"("星曜", "宮位", "亮度序")');
+const scoreSchema = [...DIMENSIONS, "綜合"].map((dimension) => `${quoteIdent(`${dimension}分`)} REAL NOT NULL`).join(", ");
+db.run(`CREATE TEMP TABLE "_命盤原始評分" ("KEY" TEXT PRIMARY KEY, ${scoreSchema})`);
+
 const insert = db.prepare(`INSERT INTO 命盤 (${columns.map(([name]) => quoteIdent(name)).join(",")}) VALUES (${columns.map(() => "?").join(",")})`);
+const brightnessInsert = db.prepare('INSERT INTO "星曜亮度" VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+const scoreInsert = db.prepare(`INSERT INTO "_命盤原始評分" VALUES (${["KEY", ...DIMENSIONS, "綜合"].map(() => "?").join(",")})`);
+const scoreDetailInsert = db.prepare('INSERT INTO "命盤評分明細" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 db.run("BEGIN");
 let rowCount = 0;
 console.log(`Generating ${dates.length * HOURS.length * GENDERS.length} charts for ${year}…`);
@@ -179,6 +213,24 @@ for (const date of dates) {
       }
       values.空宮數 = emptyCount;
       insert.run(columns.map(([name]) => values[name] ?? ""));
+      for (const palace of chart.palaces) {
+        for (const star of palace.stars) {
+          const brightnessOrder = brightnessRank.get(star.brightness);
+          if (!brightnessOrder) continue;
+          brightnessInsert.run([
+            values.KEY, star.name, palace.name, star.type, STAR_NATURE[star.name] ?? "mixed",
+            star.brightness, brightnessOrder, star.siHua ?? "",
+          ]);
+        }
+      }
+      const rating = scoreChart(chart);
+      scoreInsert.run([values.KEY, ...DIMENSIONS.map((dimension) => rating.scores[dimension]), rating.scores.綜合]);
+      for (const item of rating.details) {
+        scoreDetailInsert.run([
+          values.KEY, item.id, item.dimension, item.type, item.star, item.palace,
+          item.brightness, item.brightnessOrder, item.factor, item.base, item.contribution, item.description,
+        ]);
+      }
       rowCount += 1;
     }
   }
@@ -189,6 +241,26 @@ for (const date of dates) {
 }
 db.run("COMMIT");
 insert.free();
+brightnessInsert.free();
+scoreInsert.free();
+scoreDetailInsert.free();
+
+const scoredDimensions = [...DIMENSIONS, "綜合"];
+const percentileColumns = scoredDimensions.map((dimension) => `ROUND(PERCENT_RANK() OVER (ORDER BY ${quoteIdent(`${dimension}分`)} ASC) * 100, 2) AS ${quoteIdent(`${dimension}百分位`)}`);
+db.run(`CREATE TEMP TABLE "_含百分位" AS SELECT *, ${percentileColumns.join(", ")} FROM "_命盤原始評分"`);
+const ratingSchema = scoredDimensions.flatMap((dimension) => [
+  `${quoteIdent(`${dimension}分`)} REAL NOT NULL`,
+  `${quoteIdent(`${dimension}排名`)} TEXT NOT NULL`,
+  `${quoteIdent(`${dimension}百分位`)} REAL NOT NULL`,
+]);
+db.run(`CREATE TABLE "命盤評分" ("KEY" TEXT PRIMARY KEY REFERENCES "命盤"("KEY"), ${ratingSchema.join(", ")})`);
+const sqlQuote = (value) => `'${String(value).replaceAll("'", "''")}'`;
+const rankCase = (dimension) => `CASE ${RANK_THRESHOLDS.map(([rank, minimum]) => `WHEN ${quoteIdent(`${dimension}百分位`)} >= ${minimum} THEN ${sqlQuote(rank)}`).join(" ")} END`;
+const ratingValues = scoredDimensions.flatMap((dimension) => [quoteIdent(`${dimension}分`), `${rankCase(dimension)} AS ${quoteIdent(`${dimension}排名`)}`, quoteIdent(`${dimension}百分位`)]);
+db.run(`INSERT INTO "命盤評分" SELECT "KEY", ${ratingValues.join(", ")} FROM "_含百分位"`);
+for (const dimension of scoredDimensions) db.run(`CREATE INDEX ${quoteIdent(`idx_評分_${dimension}`)} ON "命盤評分"(${quoteIdent(`${dimension}排名`)}, ${quoteIdent(`${dimension}分`)} DESC)`);
+db.run('DROP TABLE "_含百分位"');
+db.run('DROP TABLE "_命盤原始評分"');
 
 const bytes = Buffer.from(db.export());
 db.close();
@@ -196,6 +268,9 @@ const gzip = zlib.gzipSync(bytes, { level: 9 });
 const hash = crypto.createHash("sha256").update(gzip).digest("hex");
 fs.writeFileSync(path.join(dataDir, `ziwei-${year}.sqlite`), bytes);
 fs.writeFileSync(path.join(dataDir, `ziwei-${year}.sqlite.gz`), gzip);
+const ratingMetadata = [{ name:"KEY", type:"TEXT" }, ...[...DIMENSIONS, "綜合"].flatMap((dimension) => [
+  { name:`${dimension}分`, type:"REAL" }, { name:`${dimension}排名`, type:"TEXT" }, { name:`${dimension}百分位`, type:"REAL" },
+])];
 const metadata = {
   version: 1,
   generatedAt: new Date().toISOString(),
@@ -206,6 +281,13 @@ const metadata = {
   table: "命盤",
   tables: {
     命盤: columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })),
+    星曜亮度: ["KEY","星曜","宮位","星曜類型","星性質","亮度","亮度序","四化"].map((name) => ({ name, type: name === "亮度序" ? "INTEGER" : "TEXT" })),
+    亮度等級: [{ name:"亮度", type:"TEXT" }, { name:"亮度序", type:"INTEGER" }],
+    命盤評分: ratingMetadata,
+    命盤評分明細: ["KEY","規則ID","維度","類型","星曜","宮位","亮度","亮度序","亮度倍率","基礎作用","實際貢獻","說明"].map((name) => ({ name, type: ["亮度序"].includes(name) ? "INTEGER" : ["亮度倍率","基礎作用","實際貢獻"].includes(name) ? "REAL" : "TEXT" })),
+    評分規則: ["規則ID","維度","類型","星曜","適用宮位","基礎作用","說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
+    評分維度: [{ name:"維度", type:"TEXT" }, { name:"基礎分", type:"REAL" }, { name:"綜合權重", type:"REAL" }],
+    排名門檻: [{ name:"排名", type:"TEXT" }, { name:"最低百分位", type:"REAL" }],
   },
   sqlite: `data/ziwei-${year}.sqlite.gz`,
   hash,
@@ -215,7 +297,16 @@ const metadata = {
   stars,
   palaces,
   brightness: ["廟", "旺", "得", "利", "平", "不", "陷"],
+  brightnessLevels: Object.fromEntries(BRIGHTNESS_LEVELS),
   palaceSemantics: palaceSpecs,
+  scoring: {
+    dimensions: [...DIMENSIONS, "綜合"],
+    starRules: STAR_RULES.length,
+    contextRules: CONTEXT_RULES.length,
+    configuration: DIMENSION_CONFIG,
+    thresholds: RANK_THRESHOLDS,
+    formula: "base + sum(baseEffect × nature/polarity-specific brightnessFactor) + contextual transformations/synergies; clamp 0..100; annual percentile",
+  },
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
-console.log(JSON.stringify({ year, rowCount, columns: columns.length, stars: stars.length, palaces: palaces.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));
+console.log(JSON.stringify({ year, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, contextRules: CONTEXT_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));

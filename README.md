@@ -15,7 +15,8 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - Direct columns for `命宮`, `身宮`, and `身宮宮位`.
 - First-class 空宮 data for every palace: empty flag, opposite palace and stars, effective borrowed stars, and provenance.
 - `空宮數` for direct multi-empty-palace research. See [PALACE_SEMANTICS.md](PALACE_SEMANTICS.md).
-- No generalized point scores, percentiles, or SSS/SSR grades. Named patterns are expressed as explicit, inspectable Zi Wei conditions.
+- A normalized `星曜亮度` table and ordinal `亮度等級` lookup for direct SQL comparisons.
+- Separate `命盤評分`, `命盤評分明細`, and `評分規則` tables; scores, annual percentiles, grades, and every contributing rule remain inspectable without changing the raw `命盤` table.
 
 The chart generator is a batch-oriented port of `ziwei-doushu/lib/ziwei/algorithm.ts`. It uses the same `iztro` `astro.bySolar` call and `lunar-javascript`; exact traditional Chinese brightness labels are retained for filtering.
 
@@ -29,7 +30,9 @@ npm run serve
 
 Serve `dist/` through an HTTP server. Do not open `index.html` directly because SQLite WASM and the database are fetched by a Web Worker.
 
-`build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮／身宮, all 12 opposite-palace mappings, empty-palace borrowing, and every sample query.
+`build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮／身宮, all 12 opposite-palace mappings, empty-palace borrowing, normalized brightness, score reconciliation, brightness regression pairs, and every sample query.
+
+Brightness is an input to the scoring engine rather than a display-only label. Its response depends on the star's nature, the signed palace-specific rule, four-transformation context, and strict same-palace synergies. See [SCORING.md](SCORING.md).
 
 ## Generate another year
 
@@ -54,6 +57,23 @@ FROM "命盤"
 WHERE "紫微星等" IN ('廟', '旺')
   AND "化祿宮位" = '財帛'
 ORDER BY "公曆日期";
+```
+
+For an ordered comparison such as `貪狼在財帛宮 AND 貪狼亮度 >= 旺`, use the normalized schema:
+
+```sql
+SELECT TOP 1000
+  m."KEY", m."命盤連結", b."星曜", b."宮位", b."亮度", b."亮度序",
+  r."財富分", r."財富排名", r."財富百分位"
+FROM "命盤" m
+JOIN "星曜亮度" b ON b."KEY" = m."KEY"
+JOIN "命盤評分" r ON r."KEY" = m."KEY"
+WHERE b."星曜" = '貪狼'
+  AND b."宮位" = '財帛'
+  AND b."亮度序" >= (
+    SELECT "亮度序" FROM "亮度等級" WHERE "亮度" = '旺'
+  )
+ORDER BY r."財富分" DESC;
 ```
 
 The browser terminal is read-only. The bundled queries use `SELECT TOP 1000`; custom queries return their exact result without a hidden row cap. CSV export exports the currently displayed result.
