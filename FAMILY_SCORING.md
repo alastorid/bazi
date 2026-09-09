@@ -57,7 +57,7 @@ The pinned `iztro` horoscope API supplies the decadal period, annualized minor-p
 - marriage and children triggers also consider the natal palace reached by the major/minor period and 流羊／流陀 disruption;
 - Family Timing rewards ages where marriage and children triggers overlap.
 
-The best age is the maximum trigger score, with the earlier age breaking ties. Gregorian year is `birth year + nominal age - 1`. Verification checks the age/year offset and that every age lies inside the returned decadal range.
+The best age is the maximum trigger score, with the earlier age breaking ties. `iztro` defines these periods by nominal (East Asian) age, not elapsed Gregorian years. Each requested nominal age is therefore resolved from the birth lunar year and sampled on July 1 of that annual period; family scoring does not consume the monthly or daily period. This avoids Lunar New Year boundary cases in which a fixed Gregorian birthday can skip a nominal age. Verification checks the resolved age/year window and that every requested age lies inside `iztro`'s returned decadal range.
 
 ## Family composites
 

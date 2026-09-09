@@ -39,8 +39,6 @@ export function getLunarInfo(year, month, day) {
   };
 }
 
-const daysInMonth = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
-
 function periodSnapshot(period, palaces) {
   return {
     index: period.index,
@@ -79,10 +77,24 @@ export function generateChart({ year, month, day, hour, gender, timingAgeRange }
   const timing = [];
   if (Array.isArray(timingAgeRange) && timingAgeRange.length === 2) {
     for (let ageValue = timingAgeRange[0]; ageValue <= timingAgeRange[1]; ageValue += 1) {
-      const targetYear = year + ageValue - 1;
-      const safeDay = Math.min(day, daysInMonth(targetYear, month));
-      const horoscope = astrolabe.horoscope(`${targetYear}-${month}-${safeDay}`, hour);
+      // Annual timing uses nominal (East Asian) age. A fixed Gregorian birthday
+      // can straddle Lunar New Year and skip a nominal age entirely, so anchor
+      // the annual snapshot at July 1 and derive its year from the birth lunar
+      // year. We do not consume monthly/daily periods in family scoring.
+      let targetYear = lunarInfo.lunarYear + ageValue - 1;
+      let horoscope;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        horoscope = astrolabe.horoscope(`${targetYear}-7-1`, hour);
+        const resolvedAge = Number(horoscope.age?.nominalAge);
+        if (resolvedAge === ageValue) break;
+        if (!Number.isFinite(resolvedAge)) throw new Error(`iztro did not return nominalAge for ${solarDate}`);
+        targetYear += ageValue - resolvedAge;
+      }
+      if (Number(horoscope.age?.nominalAge) !== ageValue) {
+        throw new Error(`could not resolve nominal age ${ageValue} for ${solarDate}`);
+      }
       const age = periodSnapshot(horoscope.age, palaces);
+      age.nominalAge = Number(horoscope.age.nominalAge);
       age.natalPalace = String(palaces[age.index]?.name ?? "");
       age.natalStars = palaces[age.index]?.stars.map((star) => star.name) ?? [];
       const decadal = periodSnapshot(horoscope.decadal, palaces);

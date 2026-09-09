@@ -69,7 +69,7 @@ if(scalar('SELECT COUNT(*) AS n FROM "family_scores"')!==metadata.rowCount)throw
 const timingAgeCount=FAMILY_CONFIG.marriageAgeRange[1]-FAMILY_CONFIG.marriageAgeRange[0]+1;
 const timingCount=scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機"');
 if(timingCount!==metadata.rowCount*timingAgeCount)throw new Error(`timing row mismatch: ${timingCount}`);
-if(scalar(`SELECT COUNT(*) AS n FROM "命盤婚育時機" t JOIN "命盤" m ON m."KEY"=t."KEY" WHERE t."年齡"<${FAMILY_CONFIG.marriageAgeRange[0]} OR t."年齡">${FAMILY_CONFIG.marriageAgeRange[1]} OR t."年份"<>m."年"+t."年齡"-1`))throw new Error("timing age/year offset mismatch");
+if(scalar(`SELECT COUNT(*) AS n FROM "命盤婚育時機" t JOIN "命盤" m ON m."KEY"=t."KEY" WHERE t."年齡"<${FAMILY_CONFIG.marriageAgeRange[0]} OR t."年齡">${FAMILY_CONFIG.marriageAgeRange[1]} OR t."年份"<m."年"+t."年齡"-2 OR t."年份">m."年"+t."年齡"`))throw new Error("timing nominal-age/calendar-year resolution mismatch");
 if(scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機" WHERE "年齡"<CAST(SUBSTR("大限範圍",1,INSTR("大限範圍",\'-\')-1) AS INTEGER) OR "年齡">CAST(SUBSTR("大限範圍",INSTR("大限範圍",\'-\')+1) AS INTEGER)'))throw new Error("age outside generated decadal range");
 if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "家庭品質全域百分位" IS NOT NULL'))throw new Error("global percentile must remain unavailable for a single-year artifact");
 for(const name of FAMILY_PERCENTILE_COMPONENTS)if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "${name}百分位"<0 OR "${name}百分位">100`))throw new Error(`${name} percentile out of range`);
@@ -82,7 +82,7 @@ if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE ABS("自身財�
 if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" f WHERE NOT EXISTS (SELECT 1 FROM "命盤婚育時機" t WHERE t."KEY"=f."KEY" AND t."年齡"=f."最佳婚姻年齡" AND t."年份"=f."最佳婚姻年份" AND t."婚姻觸發分"=f."婚姻時機分")'))throw new Error("best marriage timing metadata mismatch");
 if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" f WHERE f."父母負向分">=50 AND (SELECT COUNT(DISTINCT d."規則ID") FROM "命盤家庭評分明細" d WHERE d."KEY"=f."KEY" AND d."組件"=\'父母負向\')<2'))throw new Error("severe parent penalty triggered by fewer than two rules");
 
-const familySample=(order)=>rows(`SELECT m."KEY",m."公曆日期",m."時辰",m."性別",m."命宮主星",m."父母主星",m."子女主星",m."紫微星等",m."天府星等",m."太陰星等",f."家庭品質百分位",f."家庭平衡百分位",f."父母品質百分位",f."外貌百分位",f."婚姻百分位",f."子女百分位",f."父母負向分",f."最佳婚姻年齡",f."最佳婚姻年份",f."大限紅鸞",f."大限天喜",f."小限紅鸞",f."小限天喜",f."婚姻主要原因",f."子女主要原因" FROM "命盤" m JOIN "命盤家庭評分" f ON f."KEY"=m."KEY" ORDER BY ${order} LIMIT 10`);
+const familySample=(order)=>rows(`SELECT m."KEY",m."公曆日期",m."時辰",m."性別",m."命宮主星",m."父母主星",m."子女主星",m."紫微星等",m."天府星等",m."太陰星等",f."家庭品質百分位",f."家庭平衡百分位",f."父母品質百分位",f."外貌百分位",f."婚姻百分位",f."子女百分位",f."父母負向分",f."最佳婚姻年齡",f."最佳婚姻年份",t."大限範圍",t."大限本命宮位",t."小限本命宮位",f."大限紅鸞",f."大限天喜",f."小限紅鸞",f."小限天喜",f."流年紅鸞",f."流年天喜",(SELECT GROUP_CONCAT(d."說明",'；') FROM "命盤家庭評分明細" d WHERE d."KEY"=m."KEY" AND d."組件" IN ('父母','父母財富','父母負向')) AS "父母宮原因",f."婚姻主要原因",f."子女主要原因" FROM "命盤" m JOIN "命盤家庭評分" f ON f."KEY"=m."KEY" LEFT JOIN "命盤婚育時機" t ON t."KEY"=f."KEY" AND t."年齡"=f."最佳婚姻年齡" ORDER BY ${order} LIMIT 10`);
 const regressionExtremes={
   familyTop:familySample('f."家庭品質百分位" DESC'),familyBottom:familySample('f."家庭品質百分位" ASC'),
   balanceTop:familySample('f."家庭平衡百分位" DESC'),balanceBottom:familySample('f."家庭平衡百分位" ASC'),
