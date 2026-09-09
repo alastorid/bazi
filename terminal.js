@@ -6,7 +6,7 @@ const state = {
   activeQuery: null,
 };
 
-const worker = new Worker("sqlWorker.js?v=10");
+const worker = new Worker("sqlWorker.js?v=11");
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
@@ -51,13 +51,13 @@ function renderQueryLibrary(filter = "") {
     if (!matches.length) return "";
     const buttons = matches.map((key) => {
       const meta = QUERY_METADATA[key] ?? {};
-      const title = [key, meta.description].filter(Boolean).join(" · ");
+      const title = meta.description ?? "";
       return `<button type="button" data-sample="${escapeHtml(key)}" class="${key === state.activeQuery ? "active" : ""}" title="${escapeHtml(title)}">${escapeHtml(QUERY_LABELS[key] ?? key)}</button>`;
     }).join("");
     const open = needle || matches.includes(state.activeQuery) ? " open" : "";
     return `<details${open}><summary>${escapeHtml(group)} <small>${matches.length}</small></summary>${buttons}</details>`;
   }).join("");
-  el("#queryLibrary").innerHTML = groups || '<div class="empty-queries">No queries</div>';
+  el("#queryLibrary").innerHTML = groups || '<div class="empty-queries">沒有符合的查詢</div>';
   el("#queryCount").textContent = `(${Object.keys(SAMPLE_QUERIES).length})`;
 }
 
@@ -94,9 +94,14 @@ function renderResult() {
 function showResultTab(name) {
   document.querySelectorAll(".result-tab").forEach((button) => button.classList.toggle("active", button.dataset.resultTab === name));
   el("#resultsView").classList.toggle("active", name === "results");
-  el("#visualizationView").classList.toggle("active", name === "visualization");
   el("#messagesView").classList.toggle("active", name === "messages");
   el("#horizontalScroll").hidden = name !== "results";
+}
+
+function showWorkspace(name) {
+  document.querySelectorAll(".workspace-tab").forEach((button) => button.classList.toggle("active", button.dataset.workspaceTab === name));
+  el("#queryWorkspace").classList.toggle("active", name === "query");
+  el("#visualizationWorkspace").classList.toggle("active", name === "visualization");
   if (name === "visualization") window.BAZI_VISUALIZATION?.activate();
 }
 
@@ -105,23 +110,23 @@ async function executeSql() {
   if (!sql) return;
   hideAutocomplete();
   el("#runSql").disabled = true;
-  el("#queryState").textContent = "Executing…";
-  el("#statusText").textContent = "Executing query…";
+  el("#queryState").textContent = "執行中…";
+  el("#statusText").textContent = "正在執行查詢…";
   try {
     const result = await call("query", { sql });
     state.result = result;
     renderResult();
-    const rowLabel = `${result.rows.length.toLocaleString()} row${result.rows.length === 1 ? "" : "s"}`;
-    el("#resultMeta").textContent = `${rowLabel} · ${result.elapsedMs} ms`;
-    el("#queryState").textContent = "Executed";
-    el("#statusText").textContent = `${rowLabel} returned`;
-    el("#messagesView").textContent = `Commands completed successfully.\n\n${rowLabel} returned in ${result.elapsedMs} ms.`;
+    const rowLabel = `${result.rows.length.toLocaleString()} 筆`;
+    el("#resultMeta").textContent = `${rowLabel} · ${result.elapsedMs} 毫秒`;
+    el("#queryState").textContent = "已執行";
+    el("#statusText").textContent = `已傳回 ${rowLabel}`;
+    el("#messagesView").textContent = `命令已成功完成。\n\n${result.elapsedMs} 毫秒內傳回 ${rowLabel}。`;
     el("#exportCsv").disabled = !result.columns.length;
     showResultTab("results");
   } catch (error) {
-    el("#queryState").textContent = "Error";
-    el("#statusText").textContent = "Query failed";
-    el("#resultMeta").textContent = "Error";
+    el("#queryState").textContent = "錯誤";
+    el("#statusText").textContent = "查詢失敗";
+    el("#resultMeta").textContent = "錯誤";
     el("#messagesView").textContent = error.message;
     showResultTab("messages");
   } finally {
@@ -159,7 +164,7 @@ function updateAutocomplete(force = false) {
 function renderAutocomplete() {
   const popup = el("#autocomplete");
   if (!state.suggestions.length) return hideAutocomplete();
-  popup.innerHTML = state.suggestions.map((item, index) => `<button type="button" data-completion="${index}" class="${index === state.suggestionIndex ? "active" : ""}"><span>${escapeHtml(item)}</span><small>${item.startsWith('"') ? "column" : "keyword"}</small></button>`).join("");
+  popup.innerHTML = state.suggestions.map((item, index) => `<button type="button" data-completion="${index}" class="${index === state.suggestionIndex ? "active" : ""}"><span>${escapeHtml(item)}</span><small>${item.startsWith('"') ? "欄位" : "關鍵字"}</small></button>`).join("");
   popup.hidden = false;
 }
 
@@ -233,6 +238,7 @@ function bindEvents() {
   });
   document.addEventListener("mousedown", (event) => { if (!event.target.closest(".editor-wrap")) hideAutocomplete(); });
   document.querySelectorAll(".result-tab").forEach((button) => button.addEventListener("click", () => showResultTab(button.dataset.resultTab)));
+  document.querySelectorAll(".workspace-tab").forEach((button) => button.addEventListener("click", () => showWorkspace(button.dataset.workspaceTab)));
   el("#exportCsv").addEventListener("click", exportCsv);
   el("#queryLibrary").addEventListener("click", (event) => {
     const key = event.target.closest("[data-sample]")?.dataset.sample;
@@ -261,8 +267,8 @@ async function boot() {
   try {
     state.metadata = await call("init");
     const tableCount = Object.keys(state.metadata.tables ?? { [state.metadata.table]: state.metadata.columns }).length;
-    el("#connectionState").textContent = `SQLite · ${tableCount} ${tableCount === 1 ? "table" : "tables"}`;
-    el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} rows · ${state.metadata.columns.length} columns`;
+    el("#connectionState").textContent = `資料庫 · ${tableCount} 張資料表`;
+    el("#datasetMeta").textContent = `${state.metadata.year} 年 · ${state.metadata.rowCount.toLocaleString()} 筆 · ${state.metadata.columns.length} 欄`;
     el("#runSql").disabled = false;
     await executeSql();
     await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });

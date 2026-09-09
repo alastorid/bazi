@@ -8,17 +8,9 @@
 //   6. 夫妻宮必須與福德宮一起看；疾厄宮只做參考。
 // 本檔案是唯一版本控制來源；資料庫的 評分規則／命盤評分明細／命盤格局 都由此生成。
 
-export const DIMENSIONS = ["格局", "財富", "事業", "婚姻", "六親", "科甲", "健康"];
+export const DIMENSIONS = ["幸運", "財富", "經商", "社交", "事業", "官運", "專業", "科甲", "才藝", "外貌", "魅力", "桃花", "婚姻"];
 
-export const DIMENSION_CONFIG = {
-  格局: { baseScore: 50, overallWeight: 0.22 },
-  財富: { baseScore: 50, overallWeight: 0.20 },
-  事業: { baseScore: 50, overallWeight: 0.20 },
-  婚姻: { baseScore: 50, overallWeight: 0.16 },
-  六親: { baseScore: 50, overallWeight: 0.08 },
-  科甲: { baseScore: 50, overallWeight: 0.08 },
-  健康: { baseScore: 50, overallWeight: 0.06 },
-};
+export const DIMENSION_CONFIG = Object.fromEntries(DIMENSIONS.map((name) => [name, { baseScore: 0, overallWeight: 1 }]));
 
 // This is an ordinal query scale, not a score. Contribution strength is
 // determined separately by star nature, rule polarity, palace, and dignity.
@@ -71,139 +63,37 @@ export function brightnessFactor(star, brightness, signedBase) {
   return RESPONSE[nature][polarity][brightness] ?? 1;
 }
 
-const rule = (id, dimension, star, palaces, base, description) => ({ id, dimension, star, palaces, base, description });
+const rule = (id, dimension, star, palaces, base, description, options = {}) => ({ id, dimension, star, palaces, base, description, ...options });
 
 // ─── 星得正位（倪師：官星入官祿最好、財星入財帛最好；化權入官祿最好）───
 export const STAR_RULES = [
-  // 財富：財星正位於財帛田宅；破星、空劫、煞性破財。
-  rule("W-WU", "財富", "武曲", ["財帛"], 10, "武曲財星王正位入財帛"),
-  rule("W-WU-TIAN", "財富", "武曲", ["田宅"], 8, "武曲入田宅為財庫"),
-  rule("W-WU-GUAN", "財富", "武曲", ["官祿"], 5, "武曲入官祿掌財權（權星財星同宮另算）"),
-  rule("W-FU", "財富", "天府", ["財帛", "田宅"], 9, "天府財庫正位，善守成"),
-  rule("W-YIN", "財富", "太陰", ["財帛"], 8, "太陰正財入財帛，積蓄之財"),
-  rule("W-YIN-TIAN", "財富", "太陰", ["田宅"], 7, "太陰入田宅，置產累積"),
-  rule("W-TAN", "財富", "貪狼", ["財帛"], 5, "貪狼機會財入財帛（落陷則無力）"),
-  rule("W-LU", "財富", "祿存", ["財帛"], 8, "祿存入財帛善於理財（慳吝）"),
-  rule("W-LU-MING", "財富", "祿存", ["命宮"], 6, "命宮帶祿存，一生財祿不缺"),
-  rule("W-ZI", "財富", "紫微", ["財帛"], 4, "紫微在財帛，私企做主管或自己做事"),
-  rule("W-SUN", "財富", "太陽", ["財帛"], 3, "太陽在財帛主橫財（非固定收入）"),
-  rule("W-PO", "財富", "破軍", ["財帛"], -4, "破星入財帛主破財"),
-  rule("W-JU", "財富", "巨門", ["財帛"], -3, "巨門（殺星）在財帛不可能做生意，廟旺稍緩"),
-  rule("W-KONG", "財富", "地空", ["財帛", "田宅"], -8, "地空入財田，落空波動"),
-  rule("W-JIE", "財富", "地劫", ["財帛", "田宅"], -8, "地劫入財田，耗損"),
-  rule("W-HUO", "財富", "火星", ["財帛"], -3, "火星入財帛為煞性波動；不因與貪狼同宮自動改判財格"),
-  rule("W-LING", "財富", "鈴星", ["財帛"], -3, "鈴星入財帛為煞性波動；不因與貪狼同宮自動改判財格"),
-  rule("W-FUZUO", "財富", "左輔", ["交友"], 3, "吉星入朋友宮，合夥大吉"),
-  rule("W-YOUB", "財富", "右弼", ["交友"], 3, "吉星入朋友宮，合夥大吉"),
-  rule("W-KUI", "財富", "天魁", ["交友"], 3, "貴星入朋友宮，合夥大吉"),
-  rule("W-YUE", "財富", "天鉞", ["交友"], 3, "貴星入朋友宮，合夥大吉"),
-  rule("W-PO-YOU", "財富", "破軍", ["交友"], -4, "破星入朋友宮，合夥必敗"),
-  rule("W-MA-YOU", "財富", "天馬", ["交友"], -3, "天馬在朋友宮，為朋友奔波勞多功少"),
-
-  // 事業：官祿宮最喜化權；官星正位；六殺入官祿做官辛苦。
-  rule("C-ZI", "事業", "紫微", ["官祿"], 9, "帝星正位入官祿，官帶越大官越大"),
-  rule("C-ZI-MING", "事業", "紫微", ["命宮"], 6, "帝星坐命統御領導"),
-  rule("C-FU", "事業", "天府", ["官祿"], 7, "天府官星入官祿"),
-  rule("C-SUN", "事業", "太陽", ["官祿"], 6, "太陽官祿主入官祿，武官帶"),
-  rule("C-SUN-MING", "事業", "太陽", ["命宮"], 4, "太陽坐命武官帶"),
-  rule("C-WU-MING", "事業", "武曲", ["命宮"], 5, "武曲坐命執行剛決"),
-  rule("C-XIANG", "事業", "天相", ["官祿"], 5, "天相佐才入官祿"),
-  rule("C-JI", "事業", "天機", ["官祿"], 3, "天機文官帶入官祿"),
-  rule("C-LIANG", "事業", "天梁", ["官祿"], 3, "天梁文武雙全官帶"),
-  rule("C-TONG", "事業", "天同", ["官祿"], 2, "天同人和入官祿"),
-  rule("C-LIAN", "事業", "廉貞", ["官祿"], 2, "廉貞武官帶入官祿，主清廉"),
-  rule("C-SHA", "事業", "七殺", ["官祿"], -3, "只有七殺獨守官祿當官不好（會紫微成權另算）"),
-  rule("C-PO", "事業", "破軍", ["官祿"], -3, "破軍入官祿勞耗"),
-  rule("C-JU", "事業", "巨門", ["官祿"], -2, "巨門入官祿是非口舌，廟旺稍緩"),
-  rule("C-YANG", "事業", "擎羊", ["官祿"], -4, "六殺入官祿做官辛苦"),
-  rule("C-TUO", "事業", "陀羅", ["官祿"], -4, "六殺入官祿做官辛苦"),
-  rule("C-HUO", "事業", "火星", ["官祿"], -3, "六殺入官祿做官辛苦"),
-  rule("C-LING", "事業", "鈴星", ["官祿"], -3, "六殺入官祿做官辛苦"),
-  rule("C-KONG", "事業", "地空", ["官祿"], -5, "空劫入官祿反覆"),
-  rule("C-JIE", "事業", "地劫", ["官祿"], -5, "空劫入官祿耗損"),
-
-  // 婚姻：夫妻宮與福德宮一起看；紫府天同配偶好；巨門口角；破軍刑剋。
-  rule("M-ZI", "婚姻", "紫微", ["夫妻"], 8, "紫微在夫妻配偶優秀"),
-  rule("M-FU", "婚姻", "天府", ["夫妻"], 7, "天府在夫妻配偶溫和厚道"),
-  rule("M-XIANG", "婚姻", "天相", ["夫妻"], 5, "天相在夫妻配偶端正"),
-  rule("M-TONG", "婚姻", "天同", ["夫妻"], 6, "天同在夫妻感情好"),
-  rule("M-LIANG", "婚姻", "天梁", ["夫妻"], 4, "天梁在夫妻配偶穩重"),
-  rule("M-YIN", "婚姻", "太陰", ["夫妻"], 5, "太陰在夫妻的柔和持家作用；男命妻象尤直接"),
-  rule("M-SUN", "婚姻", "太陽", ["夫妻"], 4, "太陽在夫妻的光明扶助作用；女命夫象尤直接"),
-  rule("M-JU", "婚姻", "巨門", ["夫妻"], -4, "巨門在夫妻有口角（天同同宮不離另算）"),
-  rule("M-PO", "婚姻", "破軍", ["夫妻"], -6, "破軍在夫妻婚姻不美"),
-  rule("M-YANG", "婚姻", "擎羊", ["夫妻"], -5, "擎羊在夫妻刑剋爭執"),
-  rule("M-TUO", "婚姻", "陀羅", ["夫妻"], -5, "陀羅在夫妻拖磨糾纏"),
-  rule("M-HUO", "婚姻", "火星", ["夫妻"], -4, "火星在夫妻衝突"),
-  rule("M-LING", "婚姻", "鈴星", ["夫妻"], -4, "鈴星在夫妻暗耗"),
-  rule("M-KONG", "婚姻", "地空", ["夫妻"], -4, "地空在夫妻情緣落空"),
-  rule("M-JIE", "婚姻", "地劫", ["夫妻"], -4, "地劫在夫妻情緣耗損"),
-  rule("M-HONG", "婚姻", "紅鸞", ["命宮"], 4, "紅鸞坐命男招美妻、女有貴夫"),
-  rule("M-TIANXI", "婚姻", "天喜", ["命宮"], 3, "天喜坐命婚姻有喜"),
-  rule("M-TONG-FD", "婚姻", "天同", ["福德"], 4, "天同在福德一生福順"),
-  rule("M-LIANG-FD", "婚姻", "天梁", ["福德"], 4, "天梁在福德有庇蔭"),
-
-  // 六親：父母兄弟子女；化忌所在六親宮主剋；吉星主助力。
-  rule("K-SUN-FU", "六親", "太陽", ["父母"], 3, "太陽旺在父母旺父親"),
-  rule("K-YIN-FU", "六親", "太陰", ["父母"], 3, "太陰旺在父母旺母親"),
-  rule("K-TONG", "六親", "天同", ["父母"], 3, "天同在父母與父母感情好"),
-  rule("K-WU-FU", "六親", "武曲", ["父母"], 2, "武曲在父母父母出武貴"),
-  rule("K-WU-X", "六親", "武曲", ["兄弟"], 2, "武曲在兄弟兄弟貴"),
-  rule("K-ZI-X", "六親", "紫微", ["兄弟"], 3, "紫微在兄弟兄弟得力"),
-  rule("K-FU-X", "六親", "天府", ["兄弟"], 3, "天府在兄弟兄弟得力"),
-  rule("K-XIANG-X", "六親", "天相", ["兄弟"], 3, "天相在兄弟兄弟相助"),
-  rule("K-LIANG-X", "六親", "天梁", ["兄弟"], 2, "天梁在兄弟兄弟有蔭"),
-  rule("K-FUZUO-X", "六親", "左輔", ["兄弟"], 2, "輔弼在兄弟助力"),
-  rule("K-YOUB-X", "六親", "右弼", ["兄弟"], 2, "輔弼在兄弟助力"),
-  rule("K-KUI", "六親", "天魁", ["父母", "兄弟"], 2, "魁鉞在六親宮得長輩貴人"),
-  rule("K-YUE", "六親", "天鉞", ["父母", "兄弟"], 2, "魁鉞在六親宮得長輩貴人"),
-  rule("K-LIANG-SUN", "六親", "天梁", ["子女"], 3, "天梁（陽星）在子女兒子有成"),
-  rule("K-JU-FU", "六親", "巨門", ["父母"], -2, "巨門在父母口舌是非"),
-  rule("K-YANG", "六親", "擎羊", ["父母", "兄弟", "子女"], -3, "煞星入六親宮主剋，犯小人"),
-  rule("K-TUO", "六親", "陀羅", ["父母", "兄弟", "子女"], -3, "煞星入六親宮主剋"),
-  rule("K-HUO", "六親", "火星", ["父母", "兄弟", "子女"], -3, "煞星入六親宮主剋"),
-  rule("K-LING", "六親", "鈴星", ["父母", "兄弟", "子女"], -3, "煞星入六親宮主剋"),
-  rule("K-KONG", "六親", "地空", ["父母", "兄弟", "子女"], -3, "空劫入六親宮六親無靠"),
-  rule("K-JIE", "六親", "地劫", ["父母", "兄弟", "子女"], -3, "空劫入六親宮六親無靠"),
-
-  // 科甲：昌曲魁鉞主科甲；命會昌曲魁鉞，讀書奇才。
-  rule("E-CHANG", "科甲", "文昌", ["命宮"], 7, "文昌坐命主科甲讀書考試"),
-  rule("E-QU", "科甲", "文曲", ["命宮"], 5, "文曲坐命主才藝博學"),
-  rule("E-KUI", "科甲", "天魁", ["命宮"], 6, "天魁科甲星坐命"),
-  rule("E-YUE", "科甲", "天鉞", ["命宮"], 6, "天鉞科甲星坐命"),
-  rule("E-CHANG-GUAN", "科甲", "文昌", ["官祿"], 3, "文昌入官祿利考試任職"),
-
-  // 健康：疾厄宮只做參考；煞星在哪個宮，就知道那方面的疾病。
-  rule("H-TONG", "健康", "天同", ["疾厄", "福德"], 3, "天同福星平和少病"),
-  rule("H-LIANG", "健康", "天梁", ["疾厄"], 4, "天梁蔭星入疾厄有解厄之意"),
-  rule("H-XIANG", "健康", "天相", ["疾厄"], 3, "天相入疾厄平和"),
-  rule("H-YIN", "健康", "太陰", ["疾厄"], 2, "太陰入疾厄陰分調養"),
-  rule("H-YANG", "健康", "擎羊", ["疾厄", "命宮"], -6, "擎羊主開刀見血光"),
-  rule("H-TUO", "健康", "陀羅", ["疾厄", "命宮"], -6, "陀羅主暗疾拖延"),
-  rule("H-HUO", "健康", "火星", ["疾厄", "命宮"], -5, "火星主急性之疾"),
-  rule("H-LING", "健康", "鈴星", ["疾厄", "命宮"], -5, "鈴星主隱性之疾"),
-  rule("H-KONG", "健康", "地空", ["疾厄"], -4, "地空入疾厄耗散"),
-  rule("H-JIE", "健康", "地劫", ["疾厄"], -4, "地劫入疾厄耗損"),
-  rule("H-SHA", "健康", "七殺", ["疾厄"], -4, "七殺獨坐疾厄，對應部位注意"),
-  rule("H-PO", "健康", "破軍", ["疾厄"], -3, "破軍入疾厄耗損"),
-  rule("H-LIAN", "健康", "廉貞", ["疾厄"], -3, "廉貞入疾厄血光之象"),
-
-  // 格局：命宮吉星基礎。
-  rule("G-FUZUO", "格局", "左輔", ["命宮"], 4, "輔星坐命助力"),
-  rule("G-YOUB", "格局", "右弼", ["命宮"], 4, "弼星坐命助力"),
-  rule("G-FU", "格局", "天府", ["命宮"], 4, "天府坐命溫和統籌"),
-  rule("G-XIANG", "格局", "天相", ["命宮"], 3, "天相坐命厚道"),
-  rule("G-LIANG", "格局", "天梁", ["命宮"], 3, "天梁坐命有蔭"),
-  rule("G-TONG", "格局", "天同", ["命宮"], 3, "天同坐命人和福厚"),
-  rule("G-YIN", "格局", "太陰", ["命宮"], 3, "太陰坐命（女命尤美）"),
-  rule("G-JU", "格局", "巨門", ["命宮"], -2, "巨門坐命口舌是非，廟旺口才好稍緩"),
+  rule("財-祿存財帛", "財富", "祿存", ["財帛"], 99, "祿存入財帛：大財星得位"),
+  rule("財-武曲財帛", "財富", "武曲", ["財帛"], 99, "武曲入財帛：大財星得位"),
+  rule("財-貪狼財帛", "財富", "貪狼", ["財帛"], 99, "貪狼入財帛：大財星得位"),
+  rule("商-巨門財帛", "經商", "巨門", ["財帛"], -500, "巨門入財帛：不利自行經商"),
+  rule("婚-天府夫妻", "婚姻", "天府", ["夫妻"], 100, "天府入夫妻：溫和持家"),
+  rule("婚-天馬夫妻", "婚姻", "天馬", ["夫妻"], 100, "天馬入夫妻：吃苦耐勞"),
+  rule("婚-巨門夫妻", "婚姻", "巨門", ["夫妻"], -100, "巨門入夫妻：口角嘮叨"),
+  rule("婚-破軍夫妻", "婚姻", "破軍", ["夫妻"], -500, "破軍入夫妻：婚姻重大不利"),
+  rule("科-文昌命", "科甲", "文昌", ["命宮"], 100, "文昌入命：科甲、讀書考試"),
+  rule("藝-文曲命", "才藝", "文曲", ["命宮"], 100, "文曲入命：才藝、博學、斯文"),
+  rule("貌-太陰女命", "外貌", "太陰", ["命宮"], 300, "女命太陰入命：漂亮", { genders: ["女"] }),
+  rule("貌-紅鸞命", "外貌", "紅鸞", ["命宮"], 100, "紅鸞入命：外貌加分"),
+  rule("桃-紅鸞命", "桃花", "紅鸞", ["命宮"], 150, "紅鸞入命：桃花與婚緣"),
+  rule("婚-紅鸞男命", "婚姻", "紅鸞", ["命宮"], 300, "男命紅鸞入命：配偶外貌加分", { genders: ["男"] }),
+  rule("婚-紅鸞女命", "婚姻", "紅鸞", ["命宮"], 300, "女命紅鸞入命：配偶品質加分", { genders: ["女"] }),
+  rule("桃-天喜命", "桃花", "天喜", ["命宮"], 100, "天喜入命：桃花與喜慶"),
+  rule("桃-廉貞命", "桃花", "廉貞", ["命宮"], 50, "廉貞入命：次桃花"),
+  rule("桃-貪狼命", "桃花", "貪狼", ["命宮"], 100, "貪狼入命：桃花、酒色財氣；正桃花另限亥子"),
 ];
 
 // ─── 具名格局（倪師《天紀》明確定義的成格／破格條件）───
 // check(ctx, gender) 回傳 true 表示成格；旗標寫入 命盤格局 表（結構成立即為 1，
 // 含性別條件的格局只在符合性別的列上為 1），評分貢獻另計入命盤評分明細。
-const formation = (id, name, polarity, dimension, base, stars, description, check) =>
-  ({ id, name, polarity, dimension, base, stars, description, check });
+// 中間兩個參數保留現有格局宣告的可讀分組位置，但不參與評分；
+// 真正的多維度作用只由 FORMATION_EFFECTS 定義。
+const formation = (id, name, polarity, _group, _legacyBase, stars, description, check) =>
+  ({ id, name, polarity, stars, description, check });
 
 const BRANCH_ORDER = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
 
@@ -252,12 +142,12 @@ function buildContext(chart) {
 export const FORMATION_RULES = [
   // ── 吉格 ──
   formation("F-ZIFU-YAN", "紫府坐垣", "吉", "格局", 14, "紫微、天府",
-    "命宮在寅或申，紫微天府同入廟坐命：位列三台，將相之格，爵祿榮昌",
-    (c) => (c.mingBranch === "寅" || c.mingBranch === "申") && c.samePalace("紫微", "天府")
+    "命宮在寅，紫微天府同入廟坐命：位列三台，將相之格，爵祿榮昌",
+    (c) => c.mingBranch === "寅" && c.samePalace("紫微", "天府")
       && c.inPalace("紫微", "命宮") && c.orderOf("紫微") >= 6 && c.orderOf("天府") >= 6),
   formation("F-SHA-CHAO", "七殺朝斗", "吉", "格局", 12, "七殺",
-    "七殺獨坐入廟於寅申命宮：將星入命，威震邊疆，爵祿榮昌",
-    (c) => c.inPalace("七殺", "命宮") && (c.mingBranch === "寅" || c.mingBranch === "申")
+    "七殺獨坐入廟於申宮命宮：將星入命，威震邊疆，爵祿榮昌",
+    (c) => c.inPalace("七殺", "命宮") && c.mingBranch === "申"
       && c.orderOf("七殺") >= 6 && c.majorNames("命宮").join("、") === "七殺"),
   formation("F-RIYUE-BING", "日月並明", "吉", "格局", 12, "太陽、太陰",
     "太陽旺辰、太陰旺戌而命在辰戌，或命在丑而太陽旺巳、太陰旺酉：主一世榮華",
@@ -321,13 +211,12 @@ export const FORMATION_RULES = [
     "太陰入廟坐命子宮：清官之格，對當官的人利",
     (c) => c.inPalace("太陰", "命宮") && c.mingBranch === "子" && c.orderOf("太陰") >= 6),
   formation("F-JURI", "巨日同宮", "吉", "財富", 10, "巨門、太陽",
-    "巨門太陽均廟旺同宮坐命：腰纏黃金大富；女命主偏房（評分反轉為 −6）",
-    (c) => c.samePalace("巨門", "太陽") && c.inPalace("巨門", "命宮")
-      && c.orderOf("巨門") >= 6 && c.orderOf("太陽") >= 6),
+    "巨門太陽均廟旺同宮：巨日格，腰纏黃金大富",
+    (c) => c.samePalace("巨門", "太陽") && c.orderOf("巨門") >= 6 && c.orderOf("太陽") >= 6),
   formation("F-JURI-HUI", "巨日會命", "吉", "財富", 8, "巨門、太陽",
-    "巨門太陽均廟旺會入命宮三方：先天命中帶財，從商大利；女命主偏房（評分反轉為 −4）",
-    (c) => c.inThreeWay("巨門") && c.inThreeWay("太陽") && c.at("巨門")?.palace !== c.at("太陽")?.palace
-      && c.orderOf("巨門") >= 6 && c.orderOf("太陽") >= 6),
+    "命在寅、太陽廟旺在午、巨門廟旺在戌：巨日會命，先天帶財",
+    (c) => c.mingBranch === "寅" && c.inBranch("太陽", "午") && c.inBranch("巨門", "戌")
+      && c.orderOf("太陽") >= 6 && c.orderOf("巨門") >= 6),
   formation("F-MINGLU", "命帶祿", "吉", "財富", 6, "化祿／祿存",
     "化祿或祿存坐命：命宮帶祿，一輩子用不完的錢",
     (c) => c.mutagenPalace("祿") === "命宮" || c.inPalace("祿存", "命宮")),
@@ -378,6 +267,57 @@ export const FORMATION_RULES = [
     "身宮在官祿：後天從政做官",
     (c) => c.bodyPalace === "官祿"),
 
+  // ── 新評分稿所列的複合條件；組合加分遠高於單星加分 ──
+  formation("F-QUANLU-CAI", "權祿同財帛", "吉", "財富", 300, "化權、祿存",
+    "化權與祿存同在財帛：權祿相逢，自己做事業或當老闆",
+    (c) => c.mutagenPalace("權") === "財帛" && c.inPalace("祿存", "財帛")),
+  formation("F-WUTAN-QUANLU-MING", "武貪權祿坐命", "吉", "財富", 999, "武曲、貪狼、化權、化祿",
+    "武曲、貪狼、化權、化祿同入命宮：巨富",
+    (c) => c.inPalace("武曲", "命宮") && c.inPalace("貪狼", "命宮")
+      && c.mutagenPalace("權") === "命宮" && c.mutagenPalace("祿") === "命宮"),
+  formation("F-MING-QUANLU", "權祿會命", "吉", "財富", 500, "化權、化祿",
+    "命宮三方四正同會化權與化祿：財富與創業能力",
+    (c) => c.threeWay.includes(c.mutagenPalace("權")) && c.threeWay.includes(c.mutagenPalace("祿"))),
+  formation("F-GUAN-QUANCAI", "官祿權財", "吉", "官運", 250, "化權、大財星",
+    "官祿宮同見權星與財星：財經行業主管",
+    (c) => c.mutagenPalace("權") === "官祿" && (["祿存", "武曲", "貪狼"].some((s) => c.inPalace(s, "官祿")) || c.mutagenPalace("祿") === "官祿")),
+  formation("F-GUAN-KONG", "官祿空宮", "凶", "官運", -300, "官祿宮空宮",
+    "官祿宮無主星：不利官運",
+    (c) => c.majorNames("官祿").length === 0),
+  formation("F-LIUSHA-GUAN", "六煞入官祿", "凶", "事業", -200, "擎羊、陀羅、火星、鈴星、地空、地劫",
+    "六煞星任一入官祿宮：事業受阻",
+    (c) => c.shaStars.some((s) => c.inPalace(s, "官祿"))),
+  formation("F-WUGUAN-KE-MING", "武官化科坐命", "吉", "專業", 500, "武官星、化科",
+    "武官星與化科入命：醫師、律師、會計、工程、建築等專業自由業",
+    (c) => ["七殺", "破軍", "貪狼", "武曲"].some((s) => c.inPalace(s, "命宮")) && c.mutagenPalace("科") === "命宮"),
+  formation("F-KEQUAN-MING", "科權會命", "吉", "專業", 500, "化科、化權",
+    "命宮三方四正會化科與化權：專業主管、院長、校長、法官",
+    (c) => c.threeWay.includes(c.mutagenPalace("科")) && c.threeWay.includes(c.mutagenPalace("權"))),
+  formation("F-KUIYUE-KE-MING", "魁鉞化科會命", "吉", "科甲", 500, "天魁、天鉞、化科",
+    "魁鉞與化科同會命宮三方四正：科甲大幅加分",
+    (c) => c.inThreeWay("天魁") && c.inThreeWay("天鉞") && c.threeWay.includes(c.mutagenPalace("科"))),
+  formation("F-CHANGQU-MING", "昌曲同命", "吉", "科甲", 250, "文昌、文曲",
+    "文昌文曲同入命宮：科甲與才藝兼備",
+    (c) => c.inPalace("文昌", "命宮") && c.inPalace("文曲", "命宮")),
+  formation("F-YIN-CHANGQU-MING", "太陰昌曲同命", "吉", "魅力", 999, "太陰、文昌、文曲",
+    "太陰、文昌、文曲同入命宮：才藝過人、桃花命",
+    (c) => c.inPalace("太陰", "命宮") && c.inPalace("文昌", "命宮") && c.inPalace("文曲", "命宮")),
+  formation("F-HONGXI-MING", "紅喜同命", "吉", "桃花", 300, "紅鸞、天喜",
+    "紅鸞天喜同入命宮：桃花與婚緣",
+    (c) => c.inPalace("紅鸞", "命宮") && c.inPalace("天喜", "命宮")),
+  formation("F-HONGXI-FU", "紅喜同夫妻", "吉", "婚姻", 300, "紅鸞、天喜",
+    "紅鸞天喜同會夫妻宮：婚姻加分",
+    (c) => c.inPalace("紅鸞", "夫妻") && c.inPalace("天喜", "夫妻")),
+  formation("F-QUANLU-FU", "權祿同夫妻", "吉", "婚姻", 300, "化權、化祿",
+    "化權化祿同入夫妻宮：配偶能力強",
+    (c) => c.mutagenPalace("權") === "夫妻" && c.mutagenPalace("祿") === "夫妻"),
+  formation("F-LIANFU-FU", "廉府同夫妻", "吉", "婚姻", 250, "廉貞、天府",
+    "廉貞天府同在夫妻宮：溫和、清秀、正派厚道",
+    (c) => c.inPalace("廉貞", "夫妻") && c.inPalace("天府", "夫妻")),
+  formation("F-LIANPO-CAI", "廉破同財帛", "凶", "經商", -500, "廉貞、破軍",
+    "廉貞破軍同在財帛宮：不利自行經商",
+    (c) => c.inPalace("廉貞", "財帛") && c.inPalace("破軍", "財帛")),
+
   // ── 凶格 ──
   formation("F-BANKONG", "半空折翅", "凶", "格局", -18, "化忌沖命",
     "化忌在遷移對沖命宮而命宮三方四正無吉星：半空折翅，大限在中年（三十歲上下）",
@@ -400,12 +340,12 @@ export const FORMATION_RULES = [
   formation("F-LIANSHA-XIAN", "廉殺落陷", "凶", "格局", -14, "廉貞、七殺",
     "廉貞七殺同宮落陷：半路埋屍，橫死之格；殺星落陷在劫難逃",
     (c) => c.samePalace("廉貞", "七殺") && c.orderOf("廉貞") <= 2 && c.orderOf("七殺") <= 2),
-  formation("F-LIANPO", "廉破入夫妻福德", "凶", "婚姻", -12, "廉貞、破軍",
-    "廉貞破軍同入夫妻或福德，為婚姻重大不利訊號；倪師案例明言仍須命運、陽宅與面相同參",
-    (c) => c.samePalace("廉貞", "破軍") && ["夫妻", "福德"].includes(c.at("廉貞")?.palace)),
-  formation("F-LIANTAN-MARR", "廉貪入夫妻福德", "凶", "婚姻", -12, "廉貞、貪狼",
-    "廉貞貪狼同入夫妻或福德，為婚姻重大不利訊號；不得由單一條件直接斷生離死別",
-    (c) => c.samePalace("廉貞", "貪狼") && ["夫妻", "福德"].includes(c.at("廉貞")?.palace)),
+  formation("F-LIANPO", "廉破同夫妻", "凶", "婚姻", -999, "廉貞、破軍",
+    "廉貞破軍同入夫妻宮：婚姻重大不利；重大斷語仍須命運、陽宅與面相同參",
+    (c) => c.samePalace("廉貞", "破軍") && c.inPalace("廉貞", "夫妻")),
+  formation("F-LIANTAN-MARR", "廉貪同夫妻", "凶", "婚姻", -999, "廉貞、貪狼",
+    "廉貞貪狼同入夫妻宮：婚姻重大不利；不得由單一條件直接斷生離死別",
+    (c) => c.samePalace("廉貞", "貪狼") && c.inPalace("廉貞", "夫妻")),
   formation("F-LIANTAN-XIAN", "廉貪落陷", "凶", "格局", -14, "廉貞、貪狼",
     "廉貞貪狼同宮落陷：自殺格，主橫夭（先天疾病或自殺）",
     (c) => c.samePalace("廉貞", "貪狼") && c.orderOf("廉貞") <= 2 && c.orderOf("貪狼") <= 2),
@@ -455,54 +395,64 @@ export const FORMATION_RULES = [
     (c) => c.inPalace("太陰", "父母") && c.orderOf("太陰") <= 2),
 ];
 
-// 性別會改變基礎作用的格局：主值為男命／一般值，說明中註明反轉值。
-const GENDER_FORMATION_BASE = {
-  "F-YUE-LANG": { 男: 10, 女: 14 },
-  "F-RI-ZHAO": { 男: 14, 女: 10 },
-  "F-YINGXING": { 男: 10, 女: -6 },
-  "F-JURI": { 男: 10, 女: -6 },
-  "F-JURI-HUI": { 男: 8, 女: -4 },
-  "F-SHAPOLANG": { 男: -4, 女: -6 },
+// 一個格局可以同時作用於多個維度。這是評分唯一來源；格局旗標本身不暗加分。
+export const FORMATION_EFFECTS = {
+  "F-ZIFU-YAN": { 幸運: 999, 官運: 999, 財富: 500 },
+  "F-SHA-CHAO": { 官運: 999, 事業: 500 },
+  "F-RIYUE-BING": { 幸運: 999 },
+  "F-YUE-LANG": { 幸運: 500, 外貌: { 女: 999 } },
+  "F-RI-ZHAO": { 幸運: { 男: 500 } },
+  "F-RI-LI": { 官運: 500 },
+  "F-RIYUE-JIA": { 財富: 500, 幸運: 500 },
+  "F-FANBEI-JIA": { 幸運: -500 },
+  "F-JURI": { 財富: 999, 經商: 999 },
+  "F-JURI-HUI": { 財富: 999 },
+  "F-LUMA": { 財富: 999, 幸運: 500 },
+  "F-MINGLU": { 財富: 300 },
+  "F-ZISHA-GUAN": { 官運: 500, 事業: 500 },
+  "F-QUANLU-CAI": { 財富: 300 },
+  "F-WUTAN-QUANLU-MING": { 財富: 999 },
+  "F-MING-QUANLU": { 財富: 500, 經商: 500 },
+  "F-GUAN-QUANCAI": { 官運: 250, 財富: 150 },
+  "F-GUAN-KONG": { 官運: -300 },
+  "F-LIUSHA-GUAN": { 事業: -200 },
+  "F-WUGUAN-KE-MING": { 專業: 500 },
+  "F-KEQUAN-MING": { 專業: 500, 官運: 300 },
+  "F-KUIYUE-HUI": { 科甲: 300, 幸運: 200 },
+  "F-KUIYUE-KE-MING": { 科甲: 500 },
+  "F-CHANGQU-MING": { 科甲: 250, 才藝: 250 },
+  "F-YIN-CHANGQU-MING": { 才藝: 500, 魅力: 999 },
+  "F-HONGXI-MING": { 桃花: 300 },
+  "F-FANSHUI": { 魅力: 999, 桃花: 500 },
+  "F-FU-TIANMA": { 婚姻: 500 },
+  "F-HONGXI-FU": { 婚姻: 300 },
+  "F-QUANLU-FU": { 婚姻: 300 },
+  "F-LIANFU-FU": { 婚姻: 250 },
+  "F-LIANPO": { 婚姻: -999 },
+  "F-LIANTAN-MARR": { 婚姻: -999 },
+  "F-LIANPO-CAI": { 經商: -500 },
 };
 
-// ─── 四化（倪師：科權祿忌四化為主，無需計算飛星）───
+// 四化一律採新評分稿明列的作用；同一四化可以分別寫入多個維度。
 export const TRANSFORM_RULES = [
-  { mutagen: "祿", palace: "命宮", dimension: "財富", base: 8, description: "化祿入命：命帶祿，財祿不缺" },
-  { mutagen: "祿", palace: "財帛", dimension: "財富", base: 10, description: "化祿入財帛：自己會做生意" },
-  { mutagen: "祿", palace: "官祿", dimension: "財富", base: 4, description: "化祿入官祿：貪官或手握財權" },
-  { mutagen: "祿", palace: "田宅", dimension: "財富", base: 8, description: "化祿入田宅：不動產財庫" },
-  { mutagen: "祿", palace: "父母", dimension: "六親", base: 8, description: "化祿入父母：有祖產財祿，父母從商" },
-  { mutagen: "祿", palace: "子女", dimension: "六親", base: 6, description: "化祿入子女：兒子優秀適合做生意" },
-  { mutagen: "祿", palace: "交友", dimension: "財富", base: 5, description: "化祿入朋友：合夥大利，自己很會做人" },
-  { mutagen: "祿", palace: "遷移", dimension: "財富", base: 5, description: "化祿入遷移：外地經商大利" },
-  { mutagen: "權", palace: "官祿", dimension: "事業", base: 12, description: "化權入官祿：官祿宮最喜權星入宮" },
-  { mutagen: "權", palace: "命宮", dimension: "事業", base: 8, description: "化權入命：先天領導之才，主見很強" },
-  { mutagen: "權", palace: "財帛", dimension: "財富", base: 8, description: "化權入財帛：自己做生意當老闆" },
-  { mutagen: "權", palace: "夫妻", dimension: "婚姻", base: 2, description: "化權入夫妻：配偶性剛有主見" },
-  { mutagen: "權", palace: "子女", dimension: "六親", base: 4, description: "化權入子女：兒子有武官權" },
-  { mutagen: "權", palace: "父母", dimension: "六親", base: 3, description: "化權入父母：父母做官" },
-  { mutagen: "科", palace: "命宮", dimension: "科甲", base: 6, description: "化科入命：讀書考試都好，為人師表" },
-  { mutagen: "科", palace: "官祿", dimension: "事業", base: 5, description: "化科入官祿：適合考公家單位" },
-  { mutagen: "科", palace: "財帛", dimension: "財富", base: 4, description: "化科入財帛：必有技術專長" },
-  { mutagen: "科", palace: "父母", dimension: "六親", base: 3, description: "化科入父母：父母有文名" },
-  { mutagen: "科", palace: "遷移", dimension: "科甲", base: 4, description: "化科入遷移：去外地讀書拿學位" },
-  { mutagen: "忌", palace: "命宮", dimension: "格局", base: -10, description: "化忌入命：早年不順，容易想不開" },
-  { mutagen: "忌", palace: "兄弟", dimension: "六親", base: -8, description: "化忌入兄弟：兄弟不和或夭折，合夥破財" },
-  { mutagen: "忌", palace: "夫妻", dimension: "婚姻", base: -12, description: "化忌入夫妻：主生離" },
-  { mutagen: "忌", palace: "子女", dimension: "六親", base: -8, description: "化忌入子女：與子女緣分或相處不利；無子另須空宮與對宮化忌等複合條件" },
-  { mutagen: "忌", palace: "財帛", dimension: "財富", base: -12, description: "化忌入財帛：不會做生意，諸事不順" },
-  { mutagen: "忌", palace: "疾厄", dimension: "健康", base: -8, description: "化忌入疾厄：對應部位注意健康" },
-  { mutagen: "忌", palace: "遷移", dimension: "格局", base: -6, description: "化忌在遷移沖命：本命沖大凶；無吉星則成半空折翅" },
-  { mutagen: "忌", palace: "交友", dimension: "財富", base: -8, description: "化忌入朋友：合夥必敗，朋友變仇人" },
-  { mutagen: "忌", palace: "官祿", dimension: "事業", base: -12, description: "化忌入官祿：不利當官，流年逢之事業停擺" },
-  { mutagen: "忌", palace: "田宅", dimension: "六親", base: -8, description: "化忌入田宅：破祖業，耗掉父母財產" },
-  { mutagen: "忌", palace: "福德", dimension: "婚姻", base: -10, description: "化忌入福德：福德與婚姻不利；重大斷語仍須命運、陽宅與面相同參" },
-  { mutagen: "忌", palace: "父母", dimension: "六親", base: -10, description: "化忌入父母：與父母緣分較弱或父母不在身邊；父母雙亡須再見日月反背等複合條件" },
+  { id: "化祿-財帛-財富", mutagen: "祿", palace: "財帛", dimension: "財富", base: 99, description: "化祿入財帛：大財星得位" },
+  { id: "化祿-遷移-財富", mutagen: "祿", palace: "遷移", dimension: "財富", base: 150, description: "化祿入遷移：外地經商大利" },
+  { id: "化祿-遷移-經商", mutagen: "祿", palace: "遷移", dimension: "經商", base: 150, description: "化祿入遷移：外地經商大利" },
+  { id: "化祿-交友-經商", mutagen: "祿", palace: "交友", dimension: "經商", base: 100, description: "化祿入朋友：合夥大利" },
+  { id: "化祿-交友-社交", mutagen: "祿", palace: "交友", dimension: "社交", base: 100, description: "化祿入朋友：會做人、社交加分" },
+  { id: "化祿-官祿-財富", mutagen: "祿", palace: "官祿", dimension: "財富", base: 100, description: "化祿入官祿：財經主管、手握財權" },
+  { id: "化祿-官祿-官運", mutagen: "祿", palace: "官祿", dimension: "官運", base: 100, description: "化祿入官祿：財經主管、手握財權" },
+  { id: "化權-官祿-官運", mutagen: "權", palace: "官祿", dimension: "官運", base: 300, description: "化權入官祿：官祿宮最喜權星" },
+  { id: "化權-官祿-事業", mutagen: "權", palace: "官祿", dimension: "事業", base: 300, description: "化權入官祿：事業掌權" },
+  { id: "化科-命宮-科甲", mutagen: "科", palace: "命宮", dimension: "科甲", base: 300, description: "化科入命：讀書考試、為人師表" },
+  { id: "化忌-財帛-經商", mutagen: "忌", palace: "財帛", dimension: "經商", base: -500, description: "化忌入財帛：不會自行經商" },
+  { id: "化忌-官祿-事業", mutagen: "忌", palace: "官祿", dimension: "事業", base: -500, description: "化忌入官祿：事業停滯" },
+  { id: "化忌-官祿-官運", mutagen: "忌", palace: "官祿", dimension: "官運", base: -500, description: "化忌入官祿：不利官運" },
 ];
 
 // 四化規則目錄（供 評分規則 表與 metadata 使用）。
 export const CONTEXT_RULES = TRANSFORM_RULES.map((item) => ({
-  id: `H-${item.mutagen}-${item.palace}`,
+  id: item.id,
   dimension: item.dimension,
   type: "四化",
   description: item.description,
@@ -525,6 +475,7 @@ export function scoreChart(chart, gender = "男") {
 
   // 星得正位
   for (const item of STAR_RULES) {
+    if (item.genders && !item.genders.includes(gender)) continue;
     const star = ctx.at(item.star);
     if (!star || !resolvePalaces(item.palaces).includes(star.palace)) continue;
     const factor = brightnessFactor(star.name, star.brightness, item.base);
@@ -544,7 +495,7 @@ export function scoreChart(chart, gender = "男") {
     if (!transformed || transformed.palace !== palace) continue;
     const factor = 0.5 + brightnessFactor(transformed.name, transformed.brightness, item.base) * 0.5;
     const contribution = Math.round(item.base * factor * 100) / 100;
-    addContext(`H-${item.mutagen}-${item.palace}`, item.dimension, "四化", transformed.name, transformed.palace, transformed.brightness, factor, item.base, contribution, item.description);
+    addContext(item.id, item.dimension, "四化", transformed.name, transformed.palace, transformed.brightness, factor, item.base, contribution, item.description);
   }
 
   // 具名格局：實際落宮成立才算，絕不使用借對宮語義。
@@ -557,20 +508,24 @@ export function scoreChart(chart, gender = "男") {
       formed = false;
     }
     if (!formed) continue;
-    const base = GENDER_FORMATION_BASE[item.id]?.[gender] ?? item.base;
     const involved = item.stars.split("、").map((name) => ctx.at(name)).filter(Boolean);
     const brightness = involved.map((star) => star.brightness || "").join("/") ?? "";
     const palace = involved[0]?.palace ?? "";
-    const contribution = Math.round(base * 100) / 100;
-    scores[item.dimension] += contribution;
+    const effects = FORMATION_EFFECTS[item.id] ?? {};
     formations.push({
-      id: item.id, name: item.name, polarity: item.polarity, dimension: item.dimension,
-      stars: item.stars, palace, brightness, base, contribution, description: item.description,
+      id: item.id, name: item.name, polarity: item.polarity,
+      stars: item.stars, palace, brightness, effects, description: item.description,
     });
-    details.push(detail(item.id, item.dimension, "格局", item.stars, palace, brightness, 1, base, contribution, item.description));
+    for (const [dimension, configured] of Object.entries(effects)) {
+      const base = typeof configured === "number" ? configured : configured?.[gender];
+      if (!Number.isFinite(base) || !DIMENSIONS.includes(dimension)) continue;
+      const contribution = Math.round(base * 100) / 100;
+      scores[dimension] += contribution;
+      details.push(detail(`${item.id}-${dimension}`, dimension, "格局", item.stars, palace, brightness, 1, base, contribution, item.description));
+    }
   }
 
-  for (const dimension of DIMENSIONS) scores[dimension] = Math.round(Math.max(0, Math.min(100, scores[dimension])) * 100) / 100;
+  for (const dimension of DIMENSIONS) scores[dimension] = Math.round(scores[dimension] * 100) / 100;
   scores.綜合 = Math.round(DIMENSIONS.reduce((sum, dimension) => sum + scores[dimension] * DIMENSION_CONFIG[dimension].overallWeight, 0) * 100) / 100;
   return { scores, details, formations, formationFlags: Object.fromEntries(FORMATION_RULES.map((item) => [item.name, formations.some((f) => f.id === item.id) ? 1 : 0])) };
 }

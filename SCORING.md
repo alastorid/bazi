@@ -1,62 +1,40 @@
-# Brightness-aware scoring
+# 命盤評分模型
 
-This project treats Zi Wei Dou Shu scoring as an inspectable traditional-model research aid, not as a scientific, medical, financial, or life-outcome prediction.
+本專案把紫微斗數評分視為可查核的傳統命理研究工具，不是科學、醫療、財務或人生結果預測。
 
-## Source of brightness
+## 三層評分
 
-`src/ziwei-algorithm.mjs` calls the pinned `iztro` engine with `astro.bySolar(..., "zh-TW")` and preserves each returned `star.brightness` label exactly. The yearly build does not infer a different brightness from the rendered palace text.
+`src/scoring-model.mjs` 是唯一版本控制來源，依序處理：
 
-`src/scoring-model.mjs` is the single version-controlled source for:
+1. 星曜落宮：例如祿存、武曲、貪狼在財帛；文昌、文曲在命宮。
+2. 四化落宮：例如化權入官祿、化忌入財帛。
+3. 複合格局：例如紫府坐垣、七殺朝斗、巨日格、權祿會命、祿馬交馳。格局可以同時作用多個維度，權重遠高於單星。
 
-- the ordinal query scale `陷 < 不 < 平 < 利 < 得 < 旺 < 廟`;
-- star nature (`benefic`, `mixed`, or `challenging`);
-- palace-specific signed rules for each scoring dimension;
-- nature-, polarity-, and brightness-specific response curves;
-- four-transformation and source-backed named-formation rules;
-- overall weights and annual percentile grade thresholds.
+評分維度為幸運、財富、經商、社交、事業、官運、專業、科甲、才藝、外貌、魅力、桃花、婚姻與綜合。原始分保留負數與超過 100 的值，不截斷；SSS～F 由當年全部命盤的百分位決定。
 
-The ordinal is for comparisons, not a universal point value. A bright benefic strengthens a positive effect; a fallen benefic weakens it. A challenging star at high brightness is not relabelled as auspicious. For negative rules, its brightness changes the strength or manageability of that negative meaning instead of applying a blanket “廟 = bonus, 陷 = penalty”.
+## 亮度
 
-## Database schema
+`src/ziwei-algorithm.mjs` 直接保存固定版本 `iztro` 回傳的亮度。查詢順序為 `陷 < 不 < 平 < 利 < 得 < 旺 < 廟`。亮度不是統一加減分，而是依星性、規則正負與落宮，調節該規則本身的作用；煞星廟旺不會被直接解釋成吉。
 
-The raw, wide `命盤` table keeps every `${星曜}星等` and `${星曜}宮位` column and a direct `${宮位}地支` column for branch-specific formations.
+## 資料表
 
-The build adds these separate tables:
+- `命盤`：原始寬表，每顆星各有星等與宮位，每宮各有主星、全部星與大限。
+- `星曜亮度`、`亮度等級`：可直接排序與查詢的正規化亮度資料。
+- `格局規則`：格局條件描述。
+- `格局規則作用`：一個格局對各維度及適用性別的獨立作用列。
+- `命盤格局`：每張命盤的格局旗標。
+- `評分規則`、`命盤評分明細`：實際命中規則、亮度倍率、基礎作用與實際貢獻。
+- `命盤評分`：各維度的原始分、年度百分位與排名。
 
-- `亮度等級(亮度, 亮度序)`: stable ordinal lookup for SQL.
-- `星曜亮度(KEY, 星曜, 宮位, 星曜類型, 星性質, 亮度, 亮度序, 四化)`: normalized long-form data, indexed by star, palace, brightness, and key.
-- `格局規則` and `命盤格局`: source-backed named rules and one independently queryable flag per chart.
-- `命盤評分`: one row per chart with independent score, grade, and annual percentile columns for 格局、財富、事業、婚姻、六親、科甲、健康、綜合.
-- `命盤評分明細`: one row per triggered rule, including brightness, factor, signed base effect, actual contribution, and explanation.
-- `評分規則`, `評分維度`, `排名門檻`: auditable rule catalog and configuration.
-
-Only stars for which the chart engine returns a brightness label appear in `星曜亮度`; the original wide star and palace data still remains available for every star.
-
-## Formula
-
-For a dimension `d`:
+## 公式
 
 ```text
-raw(d) = base(d)
-       + Σ palace_effect(star, palace) × response(star_nature, sign, brightness)
-       + Σ contextual_effect(four_transformations, strict_synergies, brightness)
+維度原始分 = Σ(單星落宮作用 × 星性／正負／亮度倍率)
+             + Σ(四化落宮作用 × 星性／正負／亮度倍率)
+             + Σ(已成立複合格局的多維度作用)
 
-score(d) = clamp(raw(d), 0, 100)
-overall  = weighted mean of the seven dimension scores
+綜合分 = 所有維度原始分總和
+排名 = 原始分在該生成年度全部命盤中的百分位級別
 ```
 
-Four-transformation effects use a moderated brightness response because the transformation is its own context while the transformed star still contributes through any matching star/palace rule. Named formations require their actual original palace, branch, meeting, or flanking conditions; empty-palace borrowing never creates a formation.
-
-The former 火貪／鈴貪財帛 bonuses were removed. In the supplied 《天紀》 material, 火貪／鈴貪 is explicitly a 命宮武貴／武職 pattern, not a standalone 財帛爆發財 rule. The model therefore retains `火貴格` and `鈴貴格` under 事業 only. See [NIHAIXIA_SCORING.md](NIHAIXIA_SCORING.md).
-
-Grades are based on the generated year's percentile distribution: SSS ≥ 99, SSR ≥ 96, SS ≥ 90, S ≥ 80, then A through F. Scores and ranks are not stored in `命盤`, so the scorer can be replaced and rebuilt without modifying raw charts.
-
-## Updated rankings and queries
-
-The scoring engine follows the supplied lesson order: 格局, 財富, 事業, 婚姻, 六親, 科甲, 健康, then 綜合. The Query Library is rebuilt around the same dimensions and joins `命盤格局` for named formations. The default query starts with the year's highest 格局 ranks and exposes 命財官遷, four transformations, and auspicious/inauspicious formation counts.
-
-## Regression checks
-
-`scripts/verify-data.mjs` automatically finds annual chart pairs with the same scoring rule, star, and palace but different brightness, then verifies that the contribution differs. It reconciles every final dimension score against `命盤評分明細` and independently recomputes every named-formation flag in SQL. Missing SQL predicates fail the build. It also asserts that the removed 火貪／鈴貪財帛 rule IDs cannot re-enter the generated catalog.
-
-`scripts/verify-queries.mjs` executes every sample query against the newly generated database and separately verifies an ordinal `貪狼 / 財帛 / >= 旺` query.
+產生器、評分明細、格局旗標、查詢庫與視覺化只讀同一份預計算結果。`scripts/verify-data.mjs` 會由 SQL 獨立重算所有格局旗標、核對每個分數與明細總和，並找出同星同宮但亮度不同的命盤作回歸比較。

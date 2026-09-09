@@ -7,7 +7,7 @@ function sendStatus(phase, message, progress) {
 }
 
 async function gunzip(bytes) {
-  if (!("DecompressionStream" in self)) throw new Error("此瀏覽器不支援 DecompressionStream");
+  if (!("DecompressionStream" in self)) throw new Error("此瀏覽器不支援壓縮資料解碼");
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
@@ -15,14 +15,14 @@ async function gunzip(bytes) {
 async function init() {
   sendStatus("metadata", "讀取資料規格…", 0.08);
   const metaResponse = await fetch("data/metadata.json", { cache: "no-cache" });
-  if (!metaResponse.ok) throw new Error(`metadata HTTP ${metaResponse.status}`);
+  if (!metaResponse.ok) throw new Error(`資料規格下載失敗（狀態碼 ${metaResponse.status}）`);
   metadata = await metaResponse.json();
-  sendStatus("wasm", "載入 SQLite WASM…", 0.18);
+  sendStatus("wasm", "載入資料庫引擎…", 0.18);
   importScripts("vendor/sqljs/sql-wasm.js");
   const SQL = await initSqlJs({ locateFile: (file) => `vendor/sqljs/${file}` });
   sendStatus("download", `下載 ${(metadata.compressedBytes / 1048576).toFixed(1)} MB 資料庫…`, 0.28);
   const response = await fetch(`${metadata.sqlite}?h=${metadata.hash}`, { cache: "force-cache" });
-  if (!response.ok) throw new Error(`database HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`資料庫下載失敗（狀態碼 ${response.status}）`);
   const compressed = new Uint8Array(await response.arrayBuffer());
   sendStatus("decompress", "解壓縮命盤資料…", 0.68);
   const bytes = await gunzip(compressed);
@@ -46,8 +46,8 @@ function translateTop(sql) {
 }
 
 function query(sql, params = []) {
-  if (!db) throw new Error("database not ready");
-  if (!isReadOnly(sql)) throw new Error("Web SQL Terminal 僅允許 SELECT / WITH / EXPLAIN / PRAGMA 唯讀查詢");
+  if (!db) throw new Error("資料庫尚未就緒");
+  if (!isReadOnly(sql)) throw new Error("查詢終端僅允許 SELECT／WITH／EXPLAIN／PRAGMA 唯讀查詢");
   const started = performance.now();
   const statement = db.prepare(translateTop(sql));
   statement.bind(params);
@@ -64,7 +64,7 @@ self.addEventListener("message", async (event) => {
   const { id, type, payload = {} } = event.data || {};
   try {
     const result = type === "init" ? await init() : type === "query" ? query(payload.sql, payload.params) : null;
-    if (result === null) throw new Error(`unknown worker action: ${type}`);
+    if (result === null) throw new Error(`無法辨識的背景操作：${type}`);
     self.postMessage({ id, ok: true, result });
   } catch (error) {
     self.postMessage({ id, ok: false, error: error?.message || String(error) });

@@ -16,7 +16,7 @@ const scalar=(sql)=>rows(sql)[0]?.n??0;
 const count=rows('SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if(count.n!==metadata.rowCount||count.keys!==metadata.rowCount)throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
-for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","命盤格局","命盤家庭評分","命盤家庭評分明細","命盤婚育時機","family_scores"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
+for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","格局規則作用","命盤格局","命盤家庭評分","命盤家庭評分明細","命盤婚育時機","family_scores"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
 
 const schemaNames=new Set(rows('PRAGMA table_info("命盤")').map((column)=>column.name));
 const specs=metadata.palaceSemantics;
@@ -55,7 +55,7 @@ if(scalar('SELECT COUNT(*) AS n FROM "星曜亮度" b LEFT JOIN "亮度等級" l
 const scoreCount=scalar('SELECT COUNT(*) AS n FROM "命盤評分"');
 if(scoreCount!==metadata.rowCount)throw new Error(`rating row mismatch: ${scoreCount}`);
 for(const dimension of DIMENSIONS){
-  const invalid=scalar(`WITH s AS (SELECT "KEY",SUM("實際貢獻") AS delta FROM "命盤評分明細" WHERE "維度"='${dimension}' GROUP BY "KEY") SELECT COUNT(*) AS n FROM "命盤評分" r LEFT JOIN s ON s."KEY"=r."KEY" WHERE ABS(r."${dimension}分"-ROUND(MAX(0,MIN(100,${DIMENSION_CONFIG[dimension].baseScore}+COALESCE(s.delta,0))),2))>0.011`);
+  const invalid=scalar(`WITH s AS (SELECT "KEY",SUM("實際貢獻") AS delta FROM "命盤評分明細" WHERE "維度"='${dimension}' GROUP BY "KEY") SELECT COUNT(*) AS n FROM "命盤評分" r LEFT JOIN s ON s."KEY"=r."KEY" WHERE ABS(r."${dimension}分"-ROUND(${DIMENSION_CONFIG[dimension].baseScore}+COALESCE(s.delta,0),2))>0.011`);
   if(invalid)throw new Error(`${invalid} ${dimension} scores do not reconcile to details`);
   const sss=scalar(`SELECT COUNT(*) AS n FROM "命盤評分" WHERE "${dimension}排名"='SSS'`);
   if(sss>Math.ceil(metadata.rowCount*0.03))throw new Error(`${dimension} SSS inflated: ${sss}`);
@@ -79,8 +79,8 @@ const warlordInMing=(gender,bright)=>`${gender} AND (${["七殺","破軍","貪�
 const lianPair=(pair,bright)=>`${samePalace(...pair)} AND ${pair.map((star)=>bright?`m."${star}星等" IN (${BRIGHT})`:`m."${star}星等" IN (${FALLEN})`).join(" AND ")}`;
 
 const formationPredicates={
-  "紫府坐垣":`m."命宮" IN ('寅','申') AND ${brightIn("紫微","命宮",BRIGHT)} AND ${brightIn("天府","命宮",BRIGHT)}`,
-  "七殺朝斗":`m."命宮" IN ('寅','申') AND ${brightIn("七殺","命宮",BRIGHT)} AND m."命宮主星"='七殺'`,
+  "紫府坐垣":`m."命宮"='寅' AND ${brightIn("紫微","命宮",BRIGHT)} AND ${brightIn("天府","命宮",BRIGHT)}`,
+  "七殺朝斗":`m."命宮"='申' AND ${brightIn("七殺","命宮",BRIGHT)} AND m."命宮主星"='七殺'`,
   "日月並明":`((m."命宮" IN ('辰','戌') AND ${inBranch("太陽","辰")} AND ${inBranch("太陰","戌")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})) OR (m."命宮"='丑' AND ${inBranch("太陽","巳")} AND ${inBranch("太陰","酉")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})))`,
   "月朗天門":`m."命宮"='亥' AND ${brightIn("太陰","命宮",BRIGHT)}`,
   "日照雷門":`m."命宮"='卯' AND ${brightIn("太陽","命宮",BRIGHT)}`,
@@ -97,8 +97,8 @@ const formationPredicates={
   "鈴貴格":`${inPalace("鈴星","命宮")} AND m."貪狼星等" NOT IN (${FALLEN}) AND ${inPalace("貪狼","命宮")}`,
   "英星入廟":`m."命宮" IN ('子','午') AND ${brightIn("破軍","命宮",BRIGHT)}`,
   "水澄桂萼":`m."命宮"='子' AND ${brightIn("太陰","命宮",BRIGHT)}`,
-  "巨日同宮":`${inPalace("巨門","命宮")} AND ${inPalace("太陽","命宮")} AND m."巨門星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
-  "巨日會命":`m."巨門宮位" IN ${TW} AND m."太陽宮位" IN ${TW} AND m."巨門宮位"<>m."太陽宮位" AND m."巨門星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
+  "巨日同宮":`${samePalace("巨門","太陽")} AND m."巨門星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
+  "巨日會命":`m."命宮"='寅' AND ${inBranch("太陽","午")} AND ${inBranch("巨門","戌")} AND m."巨門星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
   "命帶祿":`m."化祿宮位"='命宮' OR ${inPalace("祿存","命宮")}`,
   "紫微得輔":`${inPalace("紫微","命宮")} AND (m."左輔宮位" IN ${TW} OR m."右弼宮位" IN ${TW})`,
   "機月同梁":`m."天機宮位" IN ${TW} AND m."天梁宮位" IN ${TW} AND m."太陰宮位" IN ${TW} AND m."天同宮位" IN ${TW}`,
@@ -114,14 +114,30 @@ const formationPredicates={
   "男命武官坐命":warlordInMing("m.\"性別\"='男'",true),
   "身在財帛":`m."身宮宮位"='財帛'`,
   "身在官祿":`m."身宮宮位"='官祿'`,
+  "權祿同財帛":`m."化權宮位"='財帛' AND ${inPalace("祿存","財帛")}`,
+  "武貪權祿坐命":`${inPalace("武曲","命宮")} AND ${inPalace("貪狼","命宮")} AND m."化權宮位"='命宮' AND m."化祿宮位"='命宮'`,
+  "權祿會命":`m."化權宮位" IN ${TW} AND m."化祿宮位" IN ${TW}`,
+  "官祿權財":`m."化權宮位"='官祿' AND (m."化祿宮位"='官祿' OR ${inPalace("祿存","官祿")} OR ${inPalace("武曲","官祿")} OR ${inPalace("貪狼","官祿")})`,
+  "官祿空宮":`m."官祿主星"=''`,
+  "六煞入官祿":`(${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>inPalace(star,"官祿")).join(" OR ")})`,
+  "武官化科坐命":`(${["七殺","破軍","貪狼","武曲"].map((star)=>inPalace(star,"命宮")).join(" OR ")}) AND m."化科宮位"='命宮'`,
+  "科權會命":`m."化科宮位" IN ${TW} AND m."化權宮位" IN ${TW}`,
+  "魁鉞化科會命":`m."天魁宮位" IN ${TW} AND m."天鉞宮位" IN ${TW} AND m."化科宮位" IN ${TW}`,
+  "昌曲同命":`${inPalace("文昌","命宮")} AND ${inPalace("文曲","命宮")}`,
+  "太陰昌曲同命":`${inPalace("太陰","命宮")} AND ${inPalace("文昌","命宮")} AND ${inPalace("文曲","命宮")}`,
+  "紅喜同命":`${inPalace("紅鸞","命宮")} AND ${inPalace("天喜","命宮")}`,
+  "紅喜同夫妻":`${inPalace("紅鸞","夫妻")} AND ${inPalace("天喜","夫妻")}`,
+  "權祿同夫妻":`m."化權宮位"='夫妻' AND m."化祿宮位"='夫妻'`,
+  "廉府同夫妻":`${inPalace("廉貞","夫妻")} AND ${inPalace("天府","夫妻")}`,
+  "廉破同財帛":`${inPalace("廉貞","財帛")} AND ${inPalace("破軍","財帛")}`,
   "半空折翅":`m."化忌宮位"='遷移' AND ${auxNotInTW} AND ${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>`NOT (m."${star}宮位" IN ${TW} AND m."${star}星等" IN ('得','旺','廟'))`).join(" AND ")} AND ${huaNotInTW}`,
   "廉貪陷沖命":`m."命宮" IN ('巳','亥') AND ${inPalace("廉貞","遷移")} AND ${inPalace("貪狼","遷移")} AND m."廉貞星等" IN (${FALLEN}) AND m."貪狼星等" IN (${FALLEN})`,
   "日月反背":`m."太陽星等" IN (${FALLEN}) AND m."太陰星等" IN (${FALLEN})`,
   "日月反背夾命":`${straddle("太陽","太陰")} AND m."太陽星等" IN (${FALLEN}) AND m."太陰星等" IN (${FALLEN})`,
   "羊陀夾命":straddle("擎羊","陀羅"),
   "廉殺落陷":lianPair(["廉貞","七殺"],false),
-  "廉破入夫妻福德":`${samePalace("廉貞","破軍")} AND m."廉貞宮位" IN ('夫妻','福德')`,
-  "廉貪入夫妻福德":`${samePalace("廉貞","貪狼")} AND m."廉貞宮位" IN ('夫妻','福德')`,
+  "廉破同夫妻":`${samePalace("廉貞","破軍")} AND m."廉貞宮位"='夫妻'`,
+  "廉貪同夫妻":`${samePalace("廉貞","貪狼")} AND m."廉貞宮位"='夫妻'`,
   "廉貪落陷":lianPair(["廉貞","貪狼"],false),
   "武殺落陷":lianPair(["武曲","七殺"],false),
   "吉處藏凶":`((${["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`m."${star}宮位" IN ${TW}`).join(")+(")}))>=2 AND ((${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>`(m."${star}宮位" IN ${TW} AND m."${star}星等" IN (${FALLEN}))`).join(" OR ")}))`,
@@ -188,14 +204,14 @@ const legacyWealthRules=scalar('SELECT COUNT(*) AS n FROM "評分規則" WHERE "
 if(legacyWealthRules)throw new Error("legacy 火貪／鈴貪 wealth rules remain in Ni scoring");
 
 const regression=[];
-for(const rule of ["W-WU","W-TAN","C-SUN","H-HUO","M-ZI"]){
+for(const rule of ["財-祿存財帛","財-武曲財帛","財-貪狼財帛","商-巨門財帛","婚-天府夫妻","婚-巨門夫妻","科-文昌命","藝-文曲命","貌-太陰女命"]){
   const pair=rows(`SELECT lo."KEY" AS lowKey,lo."星曜" AS star,lo."宮位" AS palace,lo."亮度" AS lowBrightness,lo."亮度序" AS lowOrder,lo."實際貢獻" AS lowContribution,hi."KEY" AS highKey,hi."亮度" AS highBrightness,hi."亮度序" AS highOrder,hi."實際貢獻" AS highContribution FROM "命盤評分明細" lo JOIN "命盤評分明細" hi ON hi."規則ID"=lo."規則ID" AND hi."星曜"=lo."星曜" AND hi."宮位"=lo."宮位" AND hi."亮度序">lo."亮度序" WHERE lo."規則ID"='${rule}' AND hi."實際貢獻"<>lo."實際貢獻" ORDER BY hi."亮度序"-lo."亮度序" DESC LIMIT 1`)[0];
   if(pair)regression.push({rule,...pair});
 }
 if(regression.length<3)throw new Error(`expected >=3 brightness regression pairs, got ${regression.length}`);
 
 const sampleKey=`${metadata.year}0810-子時-女`;
-const sample=rows(`SELECT m."KEY",m."命盤連結",m."命宮",m."身宮",m."空宮數",r."綜合分",r."綜合排名",r."格局分",g."成格數",g."凶格數" FROM "命盤" m JOIN "命盤評分" r ON r."KEY"=m."KEY" JOIN "命盤格局" g ON g."KEY"=m."KEY" WHERE m."KEY"='${sampleKey}'`)[0];
+const sample=rows(`SELECT m."KEY",m."命盤連結",m."命宮",m."身宮",m."空宮數",r."綜合分",r."綜合排名",r."幸運分",g."成格數",g."凶格數" FROM "命盤" m JOIN "命盤評分" r ON r."KEY"=m."KEY" JOIN "命盤格局" g ON g."KEY"=m."KEY" WHERE m."KEY"='${sampleKey}'`)[0];
 if(!sample)throw new Error("required sample key not found");
 if(sample.命盤連結!==`https://metisziwei.com/chart?y=${metadata.year}&m=8&d=10&h=0&mi=0&g=f`)throw new Error(`unexpected sample chart link: ${sample.命盤連結}`);
 console.log(JSON.stringify({ok:true,...count,columns:schemaNames.size,tables:objects.size,missingRaw,invalidLinks,missingDaXian,brightnessRows:brightnessCount,ratingRows:scoreCount,familyRows:familyCount,timingRows:timingCount,parentsNegativePenaltyWeight:FAMILY_CONFIG.parentsNegativePenaltyWeight,legacyWealthRules,formationChecks,brightnessRegression:regression,parentPenaltyComparisons,regressionExtremes,sample},null,2));

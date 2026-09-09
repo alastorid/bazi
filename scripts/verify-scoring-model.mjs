@@ -15,7 +15,7 @@ const regressions = [
   [{ year: 2027, month: 2, day: 15, hour: 7, gender: "male" }, "男", "明珠出海"],
   [{ year: 2027, month: 1, day: 8, hour: 6, gender: "male" }, "男", "火貴格"],
   [{ year: 2027, month: 1, day: 1, hour: 3, gender: "male" }, "男", "殺破狼會命"],
-  [{ year: 2027, month: 2, day: 1, hour: 6, gender: "male" }, "男", "廉破入夫妻福德"],
+  [{ year: 2027, month: 2, day: 1, hour: 6, gender: "male" }, "男", "巨日同宮"],
 ];
 
 const results = [];

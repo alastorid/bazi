@@ -5,33 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="bazi" />
     <title>bazi</title>
-    <link rel="stylesheet" href="terminal.css?v=9" />
-    <link rel="stylesheet" href="visualization.css?v=1" />
+    <link rel="stylesheet" href="terminal.css?v=10" />
+    <link rel="stylesheet" href="visualization.css?v=2" />
   </head>
   <body>
     <header class="app-bar">
       <strong>bazi</strong>
-      <span id="connectionState">SQLite</span>
-      <button id="runSql" class="run-button" type="button" disabled>▶ Execute (F5)</button>
-      <button id="themeToggle" class="icon-button" type="button" title="Theme">☾</button>
+      <span id="connectionState">資料庫</span>
+      <button id="runSql" class="run-button" type="button" disabled>▶ 執行（F5）</button>
+      <button id="themeToggle" class="icon-button" type="button" title="切換主題">☾</button>
     </header>
 
     <div class="app-body">
       <aside class="object-explorer">
-        <div class="explorer-title">Sample Queries <span id="queryCount"></span></div>
-        <div class="query-search-wrap"><input id="querySearch" type="search" placeholder="Search queries" autocomplete="off" /></div>
+        <div class="explorer-title">範例查詢 <span id="queryCount"></span></div>
+        <div class="query-search-wrap"><input id="querySearch" type="search" placeholder="搜尋查詢" autocomplete="off" /></div>
         <div class="sample-list" id="queryLibrary"></div>
       </aside>
 
       <main class="workbench">
+      <div class="workspace-tabs">
+        <button class="workspace-tab active" data-workspace-tab="query" type="button">查詢</button>
+        <button class="workspace-tab" data-workspace-tab="visualization" type="button">視覺化</button>
+      </div>
+      <section id="queryWorkspace" class="workspace-view query-workspace active">
       <section class="query-pane">
         <div class="pane-tabs">
-          <button class="query-tab active" type="button">SQLQuery1.sql</button>
-          <span id="queryState">Ready</span>
+          <button class="query-tab active" type="button">查詢一.sql</button>
+          <span id="queryState">就緒</span>
         </div>
         <div class="editor-wrap">
           <div class="line-numbers" id="lineNumbers">1</div>
-          <textarea id="sqlEditor" aria-label="SQL query" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+          <textarea id="sqlEditor" aria-label="SQL 查詢" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
           <div id="autocomplete" class="autocomplete" hidden></div>
         </div>
       </section>
@@ -40,11 +45,10 @@
 
       <section class="result-pane">
         <div class="result-tabs">
-          <button class="result-tab active" data-result-tab="results" type="button">Results</button>
-          <button class="result-tab" data-result-tab="visualization" type="button">Visualization</button>
-          <button class="result-tab" data-result-tab="messages" type="button">Messages</button>
+          <button class="result-tab active" data-result-tab="results" type="button">結果</button>
+          <button class="result-tab" data-result-tab="messages" type="button">訊息</button>
           <span id="resultMeta"></span>
-          <button id="exportCsv" type="button" disabled>CSV</button>
+          <button id="exportCsv" type="button" disabled>匯出 CSV</button>
         </div>
         <div id="resultsView" class="result-view active">
           <div class="data-grid" id="dataGrid">
@@ -54,20 +58,23 @@
             </table>
           </div>
         </div>
-        <div id="visualizationView" class="result-view visualization-view"></div>
         <pre id="messagesView" class="result-view messages"></pre>
-        <div id="horizontalScroll" class="horizontal-scroll" aria-label="Horizontal result scroll"><div id="horizontalScrollInner"></div></div>
+        <div id="horizontalScroll" class="horizontal-scroll" aria-label="結果水平捲動"><div id="horizontalScrollInner"></div></div>
+      </section>
+      </section>
+      <section id="visualizationWorkspace" class="workspace-view visualization-workspace">
+        <div id="visualizationView" class="visualization-view"></div>
       </section>
       </main>
     </div>
 
     <footer class="status-bar">
-      <span id="statusText">Loading…</span>
+      <span id="statusText">載入中…</span>
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="queryLibrary.js?v=6" defer></script>
-    <script src="visualization.js?v=1" defer></script>
-    <script src="terminal.js?v=14" defer></script>
+    <script src="queryLibrary.js?v=7" defer></script>
+    <script src="visualization.js?v=2" defer></script>
+    <script src="terminal.js?v=15" defer></script>
   </body>
 </html>

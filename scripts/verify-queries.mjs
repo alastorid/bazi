@@ -38,14 +38,14 @@ if (grouped.length !== definitions.length || new Set(grouped).size !== definitio
 const count = (sql) => db.exec(sql)[0].values[0][0];
 const legacyWealthRules = count(`SELECT COUNT(*) FROM "評分規則" WHERE "規則ID" IN ('F-HUTAN-CAI','F-LINGTAN-CAI','FEW-FIRE-GREED','FEW-BELL-GREED')`);
 if (legacyWealthRules) throw new Error("legacy 火貪／鈴貪 wealth rules remain in generated database");
-if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "geju_top") throw new Error("unexpected default query");
+if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "overall_top") throw new Error("unexpected default query");
 const formationQueries = definitions.filter((definition) => definition.sql.includes('JOIN "命盤格局"'));
 if (formationQueries.length < 8) throw new Error(`expected >=8 queries over 命盤格局, got ${formationQueries.length}`);
-for (const key of ["wealth_zhengwei","career_huogui","career_zifu_guan","career_liusha","marriage_zifu","marriage_lianxiong","health_shaxing","research_brightness_rows"]) {
+for (const key of ["wealth_top","wealth_right_place","career_zisha","career_risk","appearance_moon","research_brightness"]) {
   const sql = window.BAZI_QUERY_LIBRARY.queries[key];
   if (!/星曜亮度|星等/.test(sql)) throw new Error(`${key} does not use brightness`);
 }
-for(const key of ["family_best_overall","family_wealthy_parents_beautiful","family_marriage_children","family_best_parents","family_worst_parents","family_full_target"]){
+for(const key of ["family_best","family_balanced"]){
   if(!window.BAZI_QUERY_LIBRARY.queries[key]?.includes('JOIN "命盤家庭評分"'))throw new Error(`${key} does not use precomputed family scoring`);
 }
 const normalizedRows = count('SELECT COUNT(*) FROM "星曜亮度" WHERE "星曜"=\'貪狼\' AND "宮位"=\'財帛\' AND "亮度序">=(SELECT "亮度序" FROM "亮度等級" WHERE "亮度"=\'旺\')');

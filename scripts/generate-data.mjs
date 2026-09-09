@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { generateChart, HOURS, GENDERS } from "../src/ziwei-algorithm.mjs";
 import {
   BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG,
-  FORMATION_RULES, RANK_THRESHOLDS, STAR_NATURE, STAR_RULES,
+  FORMATION_EFFECTS, FORMATION_RULES, RANK_THRESHOLDS, STAR_NATURE, STAR_RULES,
   TRANSFORM_RULES, scoreChart,
 } from "../src/scoring-model.mjs";
 import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
@@ -136,10 +136,17 @@ brightnessLevelInsert.free();
 db.run('CREATE TABLE "星曜亮度" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "星曜類型" TEXT NOT NULL, "星性質" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER NOT NULL, "四化" TEXT NOT NULL, PRIMARY KEY ("KEY", "星曜"))');
 db.run('CREATE INDEX "idx_星曜亮度_查詢" ON "星曜亮度"("星曜", "宮位", "亮度序", "KEY")');
 
-db.run('CREATE TABLE "格局規則" ("規則ID" TEXT PRIMARY KEY, "名稱" TEXT NOT NULL, "吉凶" TEXT NOT NULL, "維度" TEXT NOT NULL, "基礎作用" REAL NOT NULL, "相關星曜" TEXT NOT NULL, "條件說明" TEXT NOT NULL)');
-const formationRuleInsert = db.prepare('INSERT INTO "格局規則" VALUES (?, ?, ?, ?, ?, ?, ?)');
-for (const item of FORMATION_RULES) formationRuleInsert.run([item.id, item.name, item.polarity, item.dimension, item.base, item.stars, item.description]);
+db.run('CREATE TABLE "格局規則" ("規則ID" TEXT PRIMARY KEY, "名稱" TEXT NOT NULL, "吉凶" TEXT NOT NULL, "相關星曜" TEXT NOT NULL, "條件說明" TEXT NOT NULL)');
+const formationRuleInsert = db.prepare('INSERT INTO "格局規則" VALUES (?, ?, ?, ?, ?)');
+for (const item of FORMATION_RULES) formationRuleInsert.run([item.id, item.name, item.polarity, item.stars, item.description]);
 formationRuleInsert.free();
+db.run('CREATE TABLE "格局規則作用" ("規則ID" TEXT NOT NULL REFERENCES "格局規則"("規則ID"), "維度" TEXT NOT NULL, "適用性別" TEXT NOT NULL, "基礎作用" REAL NOT NULL, PRIMARY KEY ("規則ID", "維度", "適用性別"))');
+const formationEffectInsert = db.prepare('INSERT INTO "格局規則作用" VALUES (?, ?, ?, ?)');
+for (const item of FORMATION_RULES) for (const [dimension, configured] of Object.entries(FORMATION_EFFECTS[item.id] ?? {})) {
+  if (typeof configured === "number") formationEffectInsert.run([item.id, dimension, "全部", configured]);
+  else for (const [gender, value] of Object.entries(configured)) formationEffectInsert.run([item.id, dimension, gender, value]);
+}
+formationEffectInsert.free();
 db.run(`CREATE TABLE "命盤格局" ("KEY" TEXT PRIMARY KEY REFERENCES "命盤"("KEY"), ${FORMATION_RULES.map((item) => `${quoteIdent(item.name)} INTEGER NOT NULL`).join(", ")}, "成格數" INTEGER NOT NULL, "凶格數" INTEGER NOT NULL)`);
 db.run('CREATE INDEX "idx_命盤格局_成格數" ON "命盤格局"("成格數" DESC)');
 
@@ -154,8 +161,11 @@ thresholdInsert.free();
 db.run('CREATE TABLE "評分規則" ("規則ID" TEXT PRIMARY KEY, "維度" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "適用宮位" TEXT NOT NULL, "基礎作用" REAL, "說明" TEXT NOT NULL)');
 const scoringRuleInsert = db.prepare('INSERT INTO "評分規則" VALUES (?, ?, ?, ?, ?, ?, ?)');
 for (const item of STAR_RULES) scoringRuleInsert.run([item.id, item.dimension, "星曜宮位", item.star, item.palaces.join("、"), item.base, item.description]);
-for (const item of TRANSFORM_RULES) scoringRuleInsert.run([`H-${item.mutagen}-${item.palace}`, item.dimension, "四化", "", item.palace, item.base, item.description]);
-for (const item of FORMATION_RULES) scoringRuleInsert.run([item.id, item.dimension, "格局", item.stars, "實際落宮", item.base, item.description]);
+for (const item of TRANSFORM_RULES) scoringRuleInsert.run([item.id, item.dimension, "四化", `化${item.mutagen}`, item.palace, item.base, item.description]);
+for (const item of FORMATION_RULES) for (const [dimension, configured] of Object.entries(FORMATION_EFFECTS[item.id] ?? {})) {
+  const values = typeof configured === "number" ? [configured] : Object.values(configured);
+  scoringRuleInsert.run([`${item.id}-${dimension}`, dimension, "格局", item.stars, "實際落宮", values[0], item.description]);
+}
 scoringRuleInsert.free();
 db.run('CREATE TABLE "命盤評分明細" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "規則ID" TEXT NOT NULL REFERENCES "評分規則"("規則ID"), "維度" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER, "亮度倍率" REAL NOT NULL, "基礎作用" REAL NOT NULL, "實際貢獻" REAL NOT NULL, "說明" TEXT NOT NULL)');
 db.run('CREATE INDEX "idx_評分明細_KEY" ON "命盤評分明細"("KEY", "維度")');
@@ -402,7 +412,8 @@ const metadata = {
     亮度等級: [{ name:"亮度", type:"TEXT" }, { name:"亮度序", type:"INTEGER" }],
     命盤評分: ratingMetadata,
     命盤評分明細: ["KEY","規則ID","維度","類型","星曜","宮位","亮度","亮度序","亮度倍率","基礎作用","實際貢獻","說明"].map((name) => ({ name, type: ["亮度序"].includes(name) ? "INTEGER" : ["亮度倍率","基礎作用","實際貢獻"].includes(name) ? "REAL" : "TEXT" })),
-    格局規則: ["規則ID","名稱","吉凶","維度","基礎作用","相關星曜","條件說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
+    格局規則: ["規則ID","名稱","吉凶","相關星曜","條件說明"].map((name) => ({ name, type: "TEXT" })),
+    格局規則作用: ["規則ID","維度","適用性別","基礎作用"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
     命盤格局: ["KEY", ...FORMATION_RULES.map((item) => item.name), "成格數","凶格數"].map((name) => ({ name, type: name === "KEY" ? "TEXT" : "INTEGER" })),
     評分規則: ["規則ID","維度","類型","星曜","適用宮位","基礎作用","說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
     評分維度: [{ name:"維度", type:"TEXT" }, { name:"基礎分", type:"REAL" }, { name:"綜合權重", type:"REAL" }],
@@ -431,7 +442,7 @@ const metadata = {
     formationRules: FORMATION_RULES.length,
     configuration: DIMENSION_CONFIG,
     thresholds: RANK_THRESHOLDS,
-    formula: "base + sum(baseEffect × nature/polarity-specific brightnessFactor) + 四化宮位作用 + 具名格局（實際落宮）；clamp 0..100; annual percentile",
+    formula: "單星宮位作用（依星性質與亮度調節）＋四化宮位作用＋高權重複合格局；原始分不截斷，排名以當年百分位計算",
     family: {
       configuration: FAMILY_CONFIG,
       percentileDenominator: rowCount,
