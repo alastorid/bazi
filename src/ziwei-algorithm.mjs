@@ -39,7 +39,22 @@ export function getLunarInfo(year, month, day) {
   };
 }
 
-export function generateChart({ year, month, day, hour, gender }) {
+const daysInMonth = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+function periodSnapshot(period, palaces) {
+  return {
+    index: period.index,
+    heavenlyStem: String(period.heavenlyStem ?? ""),
+    earthlyBranch: String(period.earthlyBranch ?? ""),
+    palaceNames: (period.palaceNames ?? []).map(String),
+    mutagen: (period.mutagen ?? []).map(String),
+    starLocations: (period.stars ?? []).flatMap((stars, index) => (stars ?? []).map((star) => ({
+      name: String(star.name), index, natalPalace: String(palaces[index]?.name ?? ""),
+    }))),
+  };
+}
+
+export function generateChart({ year, month, day, hour, gender, timingAgeRange }) {
   const solarDate = `${year}-${month}-${day}`;
   const astrolabe = astro.bySolar(solarDate, hour, gender === "male" ? "男" : "女", true, "zh-TW");
   const palaces = astrolabe.palaces.map((palace) => {
@@ -56,10 +71,26 @@ export function generateChart({ year, month, day, hour, gender }) {
       stem: String(palace.heavenlyStem),
       isBodyPalace: Boolean(palace.isBodyPalace),
       daXianRange: Array.isArray(palace.decadal?.range) ? palace.decadal.range.map(Number) : [],
+      ages: Array.isArray(palace.ages) ? palace.ages.map(Number) : [],
       stars,
     };
   });
   const lunarInfo = getLunarInfo(year, month, day);
+  const timing = [];
+  if (Array.isArray(timingAgeRange) && timingAgeRange.length === 2) {
+    for (let ageValue = timingAgeRange[0]; ageValue <= timingAgeRange[1]; ageValue += 1) {
+      const targetYear = year + ageValue - 1;
+      const safeDay = Math.min(day, daysInMonth(targetYear, month));
+      const horoscope = astrolabe.horoscope(`${targetYear}-${month}-${safeDay}`, hour);
+      const age = periodSnapshot(horoscope.age, palaces);
+      age.natalPalace = String(palaces[age.index]?.name ?? "");
+      age.natalStars = palaces[age.index]?.stars.map((star) => star.name) ?? [];
+      const decadal = periodSnapshot(horoscope.decadal, palaces);
+      decadal.natalPalace = String(palaces[decadal.index]?.name ?? "");
+      decadal.range = palaces[decadal.index]?.daXianRange ?? [];
+      timing.push({ ageValue, year: targetYear, age, decadal, yearly: periodSnapshot(horoscope.yearly, palaces) });
+    }
+  }
   return {
     palaces,
     lunarInfo,
@@ -68,5 +99,6 @@ export function generateChart({ year, month, day, hour, gender }) {
     bodyPalaceName: palaces.find((palace) => palace.isBodyPalace)?.name ?? "",
     wuxingJuName: String(astrolabe.fiveElementsClass),
     wuxingJu: parseWuxingJu(String(astrolabe.fiveElementsClass)),
+    timing,
   };
 }

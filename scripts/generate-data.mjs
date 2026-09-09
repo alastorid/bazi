@@ -9,6 +9,8 @@ import {
   BRIGHTNESS_LEVELS, CONTEXT_RULES, DIMENSIONS, DIMENSION_CONFIG,
   RANK_THRESHOLDS, STAR_NATURE, STAR_RULES, scoreChart,
 } from "../src/scoring-model.mjs";
+import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
+import { scoreFamily } from "../src/scoring/family-scoring.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const year = Number(process.argv[2] || new Date().getFullYear() + 1);
@@ -36,6 +38,14 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const quoteIdent = (value) => `"${String(value).replaceAll('"', '""')}"`;
 const dates = datesOfYear(year);
 const brightnessRank = new Map(BRIGHTNESS_LEVELS);
+const familyScoreFields = [
+  ["父母分","parents"],["父母財富分","parentsWealth"],["父母負向分","parentsNegative"],["父母品質分","parentsQuality"],
+  ["穩定財富分","stableWealth"],["爆發財富分","explosiveWealth"],["自身財富分","selfWealth"],["外貌分","appearance"],
+  ["戀愛分","romance"],["婚姻分","marriage"],["婚姻時機分","marriageTiming"],["子女分","children"],
+  ["真子女宮強度分","childrenPalaceStrength"],["子女時機分","childrenTiming"],["家庭時機分","familyTiming"],
+  ["家庭品質原始分","familyRaw"],["家庭品質分","familyQuality"],["家庭平衡分","familyBalance"],
+];
+const familyPercentileScore = new Map(FAMILY_PERCENTILE_COMPONENTS.map((name) => [name, `${name}分`]));
 
 // Every natal chart contains the complete fixed star catalogue, distributed
 // across its twelve palaces. One representative chart is therefore sufficient
@@ -142,18 +152,34 @@ db.run('CREATE INDEX "idx_評分明細_KEY" ON "命盤評分明細"("KEY", "維�
 db.run('CREATE INDEX "idx_評分明細_星曜" ON "命盤評分明細"("星曜", "宮位", "亮度序")');
 const scoreSchema = [...DIMENSIONS, "綜合"].map((dimension) => `${quoteIdent(`${dimension}分`)} REAL NOT NULL`).join(", ");
 db.run(`CREATE TEMP TABLE "_命盤原始評分" ("KEY" TEXT PRIMARY KEY, ${scoreSchema})`);
+const familyRawSchema = familyScoreFields.map(([name]) => `${quoteIdent(name)} REAL NOT NULL`).join(", ");
+db.run(`CREATE TEMP TABLE "_命盤家庭原始評分" (
+  "KEY" TEXT PRIMARY KEY, "出生時間" TEXT NOT NULL, "時辰代表小時" INTEGER NOT NULL,
+  ${familyRawSchema}, "真子女宮有主星" INTEGER NOT NULL, "真子女宮來源" TEXT NOT NULL,
+  "最佳婚姻年齡" INTEGER, "最佳婚姻年份" INTEGER, "婚姻窗口起始年齡" INTEGER, "婚姻窗口結束年齡" INTEGER,
+  "最佳子女年齡" INTEGER, "最佳子女年份" INTEGER, "婚姻觸發數" INTEGER NOT NULL,
+  "大限紅鸞" INTEGER NOT NULL, "大限天喜" INTEGER NOT NULL, "小限紅鸞" INTEGER NOT NULL, "小限天喜" INTEGER NOT NULL,
+  "流年紅鸞" INTEGER NOT NULL, "流年天喜" INTEGER NOT NULL, "婚姻主要原因" TEXT NOT NULL, "子女主要原因" TEXT NOT NULL
+)`);
+db.run('CREATE TABLE "命盤婚育時機" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "年齡" INTEGER NOT NULL, "年份" INTEGER NOT NULL, "大限範圍" TEXT NOT NULL, "大限本命宮位" TEXT NOT NULL, "小限本命宮位" TEXT NOT NULL, "大限紅鸞" INTEGER NOT NULL, "大限天喜" INTEGER NOT NULL, "小限紅鸞" INTEGER NOT NULL, "小限天喜" INTEGER NOT NULL, "流年紅鸞" INTEGER NOT NULL, "流年天喜" INTEGER NOT NULL, "婚姻觸發數" INTEGER NOT NULL, "婚姻觸發分" REAL NOT NULL, "子女觸發分" REAL NOT NULL, "家庭時機分" REAL NOT NULL, "婚姻原因" TEXT NOT NULL, "子女原因" TEXT NOT NULL, PRIMARY KEY("KEY","年齡"))');
+db.run('CREATE INDEX "idx_婚育時機_KEY分數" ON "命盤婚育時機"("KEY","家庭時機分" DESC)');
+db.run('CREATE TABLE "命盤家庭評分明細" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "規則ID" TEXT NOT NULL, "組件" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER, "亮度倍率" REAL NOT NULL, "基礎作用" REAL NOT NULL, "實際貢獻" REAL NOT NULL, "年齡" INTEGER, "年份" INTEGER, "說明" TEXT NOT NULL)');
+db.run('CREATE INDEX "idx_家庭明細_KEY組件" ON "命盤家庭評分明細"("KEY","組件")');
 
 const insert = db.prepare(`INSERT INTO 命盤 (${columns.map(([name]) => quoteIdent(name)).join(",")}) VALUES (${columns.map(() => "?").join(",")})`);
 const brightnessInsert = db.prepare('INSERT INTO "星曜亮度" VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 const scoreInsert = db.prepare(`INSERT INTO "_命盤原始評分" VALUES (${["KEY", ...DIMENSIONS, "綜合"].map(() => "?").join(",")})`);
 const scoreDetailInsert = db.prepare('INSERT INTO "命盤評分明細" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+const familyInsert = db.prepare(`INSERT INTO "_命盤家庭原始評分" VALUES (${Array(38).fill("?").join(",")})`);
+const timingInsert = db.prepare(`INSERT INTO "命盤婚育時機" VALUES (${Array(18).fill("?").join(",")})`);
+const familyDetailInsert = db.prepare(`INSERT INTO "命盤家庭評分明細" VALUES (${Array(14).fill("?").join(",")})`);
 db.run("BEGIN");
 let rowCount = 0;
 console.log(`Generating ${dates.length * HOURS.length * GENDERS.length} charts for ${year}…`);
 for (const date of dates) {
   for (const hour of HOURS) {
     for (const gender of GENDERS) {
-      const chart = generateChart({ ...date, hour: hour.index, gender: gender.code });
+      const chart = generateChart({ ...date, hour: hour.index, gender: gender.code, timingAgeRange: FAMILY_CONFIG.marriageAgeRange });
       const iso = `${year}-${pad2(date.month)}-${pad2(date.day)}`;
       const compact = `${year}${pad2(date.month)}${pad2(date.day)}`;
       const byStar = new Map();
@@ -231,6 +257,31 @@ for (const date of dates) {
           item.brightness, item.brightnessOrder, item.factor, item.base, item.contribution, item.description,
         ]);
       }
+      const family = scoreFamily(chart, rating.scores);
+      const bestMarriage = family.timing.bestMarriage ?? {};
+      familyInsert.run([
+        values.KEY, `${iso} ${String(hour.index * 2).padStart(2,"0")}:00`, hour.index * 2,
+        ...familyScoreFields.map(([,property]) => family.scores[property]),
+        Number(family.flags.childrenPalaceHasMajorStar), family.flags.childrenPalaceSource,
+        family.timing.bestMarriageAge, family.timing.bestMarriageYear, family.timing.windowStartAge, family.timing.windowEndAge,
+        family.timing.bestChildrenAge, family.timing.bestChildrenYear, bestMarriage.marriageTriggerCount ?? 0,
+        Number(bestMarriage.majorPeriodHongluan), Number(bestMarriage.majorPeriodTianxi),
+        Number(bestMarriage.minorPeriodHongluan), Number(bestMarriage.minorPeriodTianxi),
+        Number(bestMarriage.yearlyHongluan), Number(bestMarriage.yearlyTianxi),
+        (bestMarriage.marriageReasons ?? []).join("；"), (family.timing.bestChildren?.childrenReasons ?? []).join("；"),
+      ]);
+      for (const period of family.timing.rows) timingInsert.run([
+        values.KEY, period.age, period.year, period.decadalRange, period.decadalPalace, period.minorPalace,
+        Number(period.majorPeriodHongluan), Number(period.majorPeriodTianxi),
+        Number(period.minorPeriodHongluan), Number(period.minorPeriodTianxi),
+        Number(period.yearlyHongluan), Number(period.yearlyTianxi), period.marriageTriggerCount,
+        period.marriageTriggerScore, period.childrenTriggerScore, period.familyTimingScore,
+        period.marriageReasons.join("；"), period.childrenReasons.join("；"),
+      ]);
+      for (const item of family.evidence) familyDetailInsert.run([
+        values.KEY, item.ruleId, item.component, item.type, item.star, item.palace, item.brightness,
+        item.brightnessOrder, item.factor, item.base, item.contribution, item.age, item.year, item.description,
+      ]);
       rowCount += 1;
     }
   }
@@ -244,6 +295,9 @@ insert.free();
 brightnessInsert.free();
 scoreInsert.free();
 scoreDetailInsert.free();
+familyInsert.free();
+timingInsert.free();
+familyDetailInsert.free();
 
 const scoredDimensions = [...DIMENSIONS, "綜合"];
 const percentileColumns = scoredDimensions.map((dimension) => `ROUND(PERCENT_RANK() OVER (ORDER BY ${quoteIdent(`${dimension}分`)} ASC) * 100, 2) AS ${quoteIdent(`${dimension}百分位`)}`);
@@ -262,6 +316,39 @@ for (const dimension of scoredDimensions) db.run(`CREATE INDEX ${quoteIdent(`idx
 db.run('DROP TABLE "_含百分位"');
 db.run('DROP TABLE "_命盤原始評分"');
 
+const familyPercentileColumns = FAMILY_PERCENTILE_COMPONENTS.map((name) => `ROUND(PERCENT_RANK() OVER (ORDER BY ${quoteIdent(familyPercentileScore.get(name))} ASC) * 100, 2) AS ${quoteIdent(`${name}百分位`)}`);
+db.run(`CREATE TEMP TABLE "_家庭含百分位" AS SELECT *, ${familyPercentileColumns.join(", ")} FROM "_命盤家庭原始評分"`);
+const percentileRankCase = (column) => `CASE ${RANK_THRESHOLDS.map(([rank, minimum]) => `WHEN ${quoteIdent(column)} >= ${minimum} THEN ${sqlQuote(rank)}`).join(" ")} END`;
+db.run(`CREATE TABLE "命盤家庭評分" AS SELECT *,
+  ${percentileRankCase("家庭品質百分位")} AS "家庭品質排名",
+  ${percentileRankCase("家庭平衡百分位")} AS "家庭平衡排名",
+  CAST(NULL AS REAL) AS "家庭品質全域百分位"
+FROM "_家庭含百分位"`);
+db.run('CREATE UNIQUE INDEX "idx_家庭評分_KEY" ON "命盤家庭評分"("KEY")');
+db.run('CREATE INDEX "idx_家庭評分_品質" ON "命盤家庭評分"("家庭品質百分位" DESC)');
+db.run('CREATE INDEX "idx_家庭評分_平衡" ON "命盤家庭評分"("家庭平衡百分位" DESC)');
+db.run(`CREATE VIEW "family_scores" AS SELECT
+  f."KEY" AS "KEY", f."出生時間" AS "birth_datetime", m."命盤連結" AS "metis_url",
+  f."父母分" AS "parents_score", f."父母百分位" AS "parents_pr_year",
+  f."父母財富分" AS "parents_wealth_score", f."父母財富百分位" AS "parents_wealth_pr_year",
+  f."父母負向分" AS "parents_negative_score", f."父母品質分" AS "parents_quality_score", f."父母品質百分位" AS "parents_quality_pr_year",
+  f."穩定財富分" AS "stable_wealth_score", f."穩定財富百分位" AS "stable_wealth_pr_year",
+  f."爆發財富分" AS "explosive_wealth_score", f."爆發財富百分位" AS "explosive_wealth_pr_year",
+  f."自身財富分" AS "self_wealth_score", f."自身財富百分位" AS "self_wealth_pr_year",
+  f."外貌分" AS "appearance_score", f."外貌百分位" AS "appearance_pr_year",
+  f."戀愛分" AS "romance_score", f."戀愛百分位" AS "romance_pr_year",
+  f."婚姻分" AS "marriage_score", f."婚姻百分位" AS "marriage_pr_year", f."婚姻時機分" AS "marriage_timing_score", f."婚姻時機百分位" AS "marriage_timing_pr_year",
+  f."子女分" AS "children_score", f."子女百分位" AS "children_pr_year", f."真子女宮強度分" AS "children_palace_strength", f."子女時機分" AS "children_timing_score",
+  f."家庭品質原始分" AS "family_quality_raw", f."家庭品質分" AS "family_quality_score", f."家庭品質百分位" AS "family_quality_pr_year", f."家庭品質全域百分位" AS "family_quality_pr_global",
+  f."家庭平衡分" AS "family_balance_score", f."家庭平衡百分位" AS "family_balance_pr_year",
+  f."真子女宮有主星" AS "children_palace_has_major_star", f."真子女宮來源" AS "children_palace_source",
+  f."最佳婚姻年齡" AS "best_marriage_age", f."最佳婚姻年份" AS "best_marriage_year", f."婚姻窗口起始年齡" AS "marriage_window_start_age", f."婚姻窗口結束年齡" AS "marriage_window_end_age",
+  f."最佳子女年齡" AS "best_children_age", f."最佳子女年份" AS "best_children_year", f."婚姻觸發數" AS "marriage_trigger_count",
+  f."大限紅鸞" AS "major_period_hongluan", f."大限天喜" AS "major_period_tianxi", f."小限紅鸞" AS "minor_period_hongluan", f."小限天喜" AS "minor_period_tianxi"
+FROM "命盤家庭評分" f JOIN "命盤" m ON m."KEY"=f."KEY"`);
+db.run('DROP TABLE "_家庭含百分位"');
+db.run('DROP TABLE "_命盤家庭原始評分"');
+
 const bytes = Buffer.from(db.export());
 db.close();
 const gzip = zlib.gzipSync(bytes, { level: 9 });
@@ -271,6 +358,17 @@ fs.writeFileSync(path.join(dataDir, `ziwei-${year}.sqlite.gz`), gzip);
 const ratingMetadata = [{ name:"KEY", type:"TEXT" }, ...[...DIMENSIONS, "綜合"].flatMap((dimension) => [
   { name:`${dimension}分`, type:"REAL" }, { name:`${dimension}排名`, type:"TEXT" }, { name:`${dimension}百分位`, type:"REAL" },
 ])];
+const familyMetadataNames = [
+  "KEY","出生時間","時辰代表小時",...familyScoreFields.map(([name])=>name),"真子女宮有主星","真子女宮來源",
+  "最佳婚姻年齡","最佳婚姻年份","婚姻窗口起始年齡","婚姻窗口結束年齡","最佳子女年齡","最佳子女年份","婚姻觸發數",
+  "大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻主要原因","子女主要原因",
+  ...FAMILY_PERCENTILE_COMPONENTS.map((name)=>`${name}百分位`),"家庭品質排名","家庭平衡排名","家庭品質全域百分位",
+];
+const familyIntegerNames = new Set(["時辰代表小時","真子女宮有主星","最佳婚姻年齡","最佳婚姻年份","婚姻窗口起始年齡","婚姻窗口結束年齡","最佳子女年齡","最佳子女年份","婚姻觸發數","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜"]);
+const familyTextNames = new Set(["KEY","出生時間","真子女宮來源","婚姻主要原因","子女主要原因","家庭品質排名","家庭平衡排名"]);
+const familyMetadata = familyMetadataNames.map((name)=>({name,type:familyTextNames.has(name)?"TEXT":familyIntegerNames.has(name)?"INTEGER":"REAL"}));
+const familyViewIntegerNames = new Set(["children_palace_has_major_star","best_marriage_age","best_marriage_year","marriage_window_start_age","marriage_window_end_age","best_children_age","best_children_year","marriage_trigger_count","major_period_hongluan","major_period_tianxi","minor_period_hongluan","minor_period_tianxi"]);
+const familyViewMetadata = ["KEY","birth_datetime","metis_url","parents_score","parents_pr_year","parents_wealth_score","parents_wealth_pr_year","parents_negative_score","parents_quality_score","parents_quality_pr_year","stable_wealth_score","stable_wealth_pr_year","explosive_wealth_score","explosive_wealth_pr_year","self_wealth_score","self_wealth_pr_year","appearance_score","appearance_pr_year","romance_score","romance_pr_year","marriage_score","marriage_pr_year","marriage_timing_score","marriage_timing_pr_year","children_score","children_pr_year","children_palace_strength","children_timing_score","family_quality_raw","family_quality_score","family_quality_pr_year","family_quality_pr_global","family_balance_score","family_balance_pr_year","children_palace_has_major_star","children_palace_source","best_marriage_age","best_marriage_year","marriage_window_start_age","marriage_window_end_age","best_children_age","best_children_year","marriage_trigger_count","major_period_hongluan","major_period_tianxi","minor_period_hongluan","minor_period_tianxi"].map((name)=>({name,type:["KEY","birth_datetime","metis_url","children_palace_source"].includes(name)?"TEXT":familyViewIntegerNames.has(name)?"INTEGER":"REAL"}));
 const metadata = {
   version: 1,
   generatedAt: new Date().toISOString(),
@@ -288,6 +386,10 @@ const metadata = {
     評分規則: ["規則ID","維度","類型","星曜","適用宮位","基礎作用","說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
     評分維度: [{ name:"維度", type:"TEXT" }, { name:"基礎分", type:"REAL" }, { name:"綜合權重", type:"REAL" }],
     排名門檻: [{ name:"排名", type:"TEXT" }, { name:"最低百分位", type:"REAL" }],
+    命盤家庭評分: familyMetadata,
+    命盤家庭評分明細: ["KEY","規則ID","組件","類型","星曜","宮位","亮度","亮度序","亮度倍率","基礎作用","實際貢獻","年齡","年份","說明"].map((name)=>({name,type:["亮度倍率","基礎作用","實際貢獻"].includes(name)?"REAL":["亮度序","年齡","年份"].includes(name)?"INTEGER":"TEXT"})),
+    命盤婚育時機: ["KEY","年齡","年份","大限範圍","大限本命宮位","小限本命宮位","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻觸發數","婚姻觸發分","子女觸發分","家庭時機分","婚姻原因","子女原因"].map((name)=>({name,type:["婚姻觸發分","子女觸發分","家庭時機分"].includes(name)?"REAL":["年齡","年份","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻觸發數"].includes(name)?"INTEGER":"TEXT"})),
+    family_scores: familyViewMetadata,
   },
   sqlite: `data/ziwei-${year}.sqlite.gz`,
   hash,
@@ -306,6 +408,12 @@ const metadata = {
     configuration: DIMENSION_CONFIG,
     thresholds: RANK_THRESHOLDS,
     formula: "base + sum(baseEffect × nature/polarity-specific brightnessFactor) + contextual transformations/synergies; clamp 0..100; annual percentile",
+    family: {
+      configuration: FAMILY_CONFIG,
+      percentileDenominator: rowCount,
+      globalPercentile: "unavailable: yearly artifacts are independent",
+      balanceMethod: "weighted harmonic mean minus the configured parents-negative penalty",
+    },
   },
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);

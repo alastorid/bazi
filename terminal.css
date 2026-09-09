@@ -25,6 +25,7 @@ button:hover:not(:disabled) { border-color:var(--accent); }button:disabled{opaci
 .result-view { display:none;min-width:0;min-height:0;overflow:hidden; }.result-view.active { display:block; }.data-grid { width:100%;max-width:100%;min-width:0;height:100%;overflow:auto;background:var(--panel); }
 table { width:max-content;min-width:100%;border-collapse:collapse;table-layout:fixed;font:12px/1.25 "Segoe UI",system-ui,sans-serif; }
 .horizontal-scroll { display:block;width:100%;height:17px;overflow-x:scroll;overflow-y:hidden;border-top:1px solid var(--line-dark);background:var(--chrome);scrollbar-gutter:stable; }.horizontal-scroll>div { height:1px;min-width:100%; }
+.horizontal-scroll[hidden]{display:none}
 th,td { height:24px;max-width:440px;padding:2px 7px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left; }
 td a { color:var(--accent);text-decoration:none; }td a:hover{text-decoration:underline}
 thead th { position:sticky;top:0;z-index:3;font-weight:400;background:var(--chrome);border-bottom-color:var(--line-dark); }.row-number { width:46px;min-width:46px;color:var(--muted);background:var(--gutter);text-align:right;font-weight:400;position:sticky;left:0;z-index:2; }thead .row-number{z-index:4}tbody tr:hover td{background:var(--select)}td.number{text-align:right;font-variant-numeric:tabular-nums}td.null{color:var(--null);font-style:italic}

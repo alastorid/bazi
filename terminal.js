@@ -94,7 +94,10 @@ function renderResult() {
 function showResultTab(name) {
   document.querySelectorAll(".result-tab").forEach((button) => button.classList.toggle("active", button.dataset.resultTab === name));
   el("#resultsView").classList.toggle("active", name === "results");
+  el("#visualizationView").classList.toggle("active", name === "visualization");
   el("#messagesView").classList.toggle("active", name === "messages");
+  el("#horizontalScroll").hidden = name !== "results";
+  if (name === "visualization") window.BAZI_VISUALIZATION?.activate();
 }
 
 async function executeSql() {
@@ -262,6 +265,7 @@ async function boot() {
     el("#datasetMeta").textContent = `${state.metadata.year} · ${state.metadata.rowCount.toLocaleString()} rows · ${state.metadata.columns.length} columns`;
     el("#runSql").disabled = false;
     await executeSql();
+    await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });
   } catch (error) {
     el("#statusText").textContent = error.message;
     el("#messagesView").textContent = error.message;

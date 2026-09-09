@@ -3,6 +3,7 @@
   const GROUPS = [
     ["overall","👑 綜合"],["wealth","💰 財富"],["appearance","👸 外貌"],["health","🌿 健康"],
     ["career","🏆 事業"],["social","🤝 社交"],["family","🏠 家庭"],["research","🔬 研究"],
+    ["birth","👪 婚育家庭"],
   ];
   const BASE = ['m."KEY" AS "KEY"','m."命盤連結"','m."公曆日期"','m."時辰"','m."性別"'];
   const NAMES = { overall:"綜合", wealth:"財富", appearance:"外貌", health:"健康", career:"事業", social:"社交", family:"家庭助力" };
@@ -52,7 +53,14 @@ ORDER BY ${order ?? `r."${NAMES[dimension]}分" DESC, m."公曆日期", m."時�
     q("family_bright","family","父田得地資源星","紫微、天府、太陽或太陰至少得地坐父母／田宅。",{dimension:"family",fields:['m."父母主星"','m."田宅主星"','m."紫微星等"','m."天府星等"','m."太陽星等"','m."太陰星等"'],where:`${b("紫微",["父母","田宅"])} OR ${b("天府",["父母","田宅"])} OR ${b("太陽",["父母","田宅"])} OR ${b("太陰",["父母","田宅"])}`}),
 
     q("research_empty_ming","research","命宮空宮與評分","保留借對宮語義並顯示七維分。",{fields:['m."命宮主星"','m."命宮是否空宮"','m."命宮對宮主星"','m."真命宮主星"','m."真命宮來源"','r."財富分"','r."幸運分"','r."外貌分"','r."健康分"','r."事業分"','r."社交分"','r."家庭助力分"'],where:'m."命宮是否空宮"=1'}),
-    q("research_brightness_rows","research","星曜亮度明細","由正規化長表查貪狼在財帛的亮度、順序及分數。",{dimension:"wealth",join:'JOIN "星曜亮度" b ON b."KEY"=m."KEY" AND b."星曜"=\'貪狼\' AND b."宮位"=\'財帛\'',fields:['b."星曜"','b."宮位"','b."星曜類型"','b."星性質"','b."亮度"','b."亮度序"','b."四化"','m."財帛主星"','m."財帛全部星"']})
+    q("research_brightness_rows","research","星曜亮度明細","由正規化長表查貪狼在財帛的亮度、順序及分數。",{dimension:"wealth",join:'JOIN "星曜亮度" b ON b."KEY"=m."KEY" AND b."星曜"=\'貪狼\' AND b."宮位"=\'財帛\'',fields:['b."星曜"','b."宮位"','b."星曜類型"','b."星性質"','b."亮度"','b."亮度序"','b."四化"','m."財帛主星"','m."財帛全部星"']}),
+
+    q("family_best_overall","birth","Best Overall Family","父母、自身財富、外貌、婚姻、子女與時機的年度綜合 PR。",{join:'JOIN "命盤家庭評分" f ON f."KEY"=m."KEY"',fields:['f."家庭品質分"','f."家庭品質排名"','f."家庭品質百分位"','f."家庭平衡百分位"','f."父母品質百分位"','f."父母財富百分位"','f."自身財富百分位"','f."外貌百分位"','f."戀愛百分位"','f."婚姻百分位"','f."子女百分位"','f."父母負向分"','f."最佳婚姻年齡"','f."最佳婚姻年份"'],order:'f."家庭品質百分位" DESC, f."家庭平衡百分位" DESC'}),
+    q("family_wealthy_parents_beautiful","birth","Wealthy Parents + Beautiful","父母財富與外貌 PR 高，父母負向低。",{join:'JOIN "命盤家庭評分" f ON f."KEY"=m."KEY"',fields:['f."家庭品質百分位"','f."父母財富分"','f."父母財富百分位"','f."父母品質百分位"','f."自身財富百分位"','f."外貌百分位"','f."父母負向分"','m."父母主星"','m."命宮主星"'],where:'f."父母財富百分位">=70 AND f."外貌百分位">=70 AND f."父母品質百分位">=60 AND f."自身財富百分位">=40 AND f."父母負向分"<=40',order:'f."家庭品質百分位" DESC'}),
+    q("family_marriage_children","birth","Marriage + Children","婚姻與子女 timing 清楚，且真子女宮有主星。",{join:'JOIN "命盤家庭評分" f ON f."KEY"=m."KEY"',fields:['f."家庭品質百分位"','f."婚姻百分位"','f."婚姻時機百分位"','f."子女百分位"','f."子女時機百分位"','f."真子女宮有主星"','f."真子女宮來源"','f."最佳婚姻年齡"','f."婚姻窗口起始年齡"','f."婚姻窗口結束年齡"','f."大限紅鸞"','f."大限天喜"','f."小限紅鸞"','f."小限天喜"'],where:'f."婚姻百分位">=65 AND f."子女百分位">=60 AND f."真子女宮有主星"=1',order:'f."家庭品質百分位" DESC'}),
+    q("family_best_parents","birth","Best For Parents","父母品質、父母財富高且負向訊號低。",{join:'JOIN "命盤家庭評分" f ON f."KEY"=m."KEY"',fields:['f."父母分"','f."父母百分位"','f."父母財富分"','f."父母財富百分位"','f."父母品質分"','f."父母品質百分位"','f."父母負向分"','m."父母主星"','m."父母全部星"','m."化祿宮位"','m."化忌宮位"'],order:'f."父母品質百分位" DESC, f."父母負向分" ASC'}),
+    q("family_worst_parents","birth","Worst For Parents","反向列出父母負向組合，供 regression 與 sanity check。",{join:'JOIN "命盤家庭評分" f ON f."KEY"=m."KEY"',fields:['f."父母負向分"','f."父母品質分"','f."父母品質百分位"','f."父母財富百分位"','m."父母主星"','m."父母全部星"','m."化忌星"','m."化忌宮位"'],where:'f."父母負向分">0',order:'f."父母負向分" DESC, f."父母品質分" ASC'}),
+    q("family_full_target","birth","Full Target","旺父母、正財、外貌、適度桃花、婚育 timing、真子女宮主星且避免嚴重父母負向。",{join:'JOIN "命盤家庭評分" f ON f."KEY"=m."KEY"',fields:['f."家庭品質百分位"','f."家庭平衡百分位"','f."父母品質百分位"','f."父母財富百分位"','f."穩定財富百分位"','f."自身財富百分位"','f."外貌百分位"','f."戀愛百分位"','f."婚姻百分位"','f."子女百分位"','f."家庭時機百分位"','f."父母負向分"','f."最佳婚姻年齡"','f."最佳婚姻年份"','f."真子女宮有主星"'],where:'f."父母品質百分位">=50 AND f."父母財富百分位">=50 AND f."穩定財富百分位">=50 AND f."外貌百分位">=50 AND f."婚姻百分位">=50 AND f."子女百分位">=50 AND f."真子女宮有主星"=1 AND f."父母負向分"<=45',order:'f."家庭品質百分位" DESC, f."家庭平衡百分位" DESC'})
   ];
   const queries=Object.fromEntries(definitions.map((x)=>[x.key,x.sql]));
   const labels=Object.fromEntries(definitions.map((x)=>[x.key,x.label]));

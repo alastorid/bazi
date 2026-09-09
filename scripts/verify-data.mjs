@@ -4,6 +4,7 @@ import zlib from "node:zlib";
 import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG } from "../src/scoring-model.mjs";
+import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const metadata=JSON.parse(fs.readFileSync(path.join(root,"data","metadata.json"),"utf8"));
@@ -15,7 +16,7 @@ const scalar=(sql)=>rows(sql)[0]?.n??0;
 const count=rows('SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if(count.n!==metadata.rowCount||count.keys!==metadata.rowCount)throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
-for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
+for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","命盤家庭評分","命盤家庭評分明細","命盤婚育時機","family_scores"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
 
 const schemaNames=new Set(rows('PRAGMA table_info("命盤")').map((column)=>column.name));
 const specs=metadata.palaceSemantics;
@@ -62,6 +63,40 @@ for(const dimension of DIMENSIONS){
 const overallExpr=DIMENSIONS.map((dimension)=>`"${dimension}分"*${DIMENSION_CONFIG[dimension].overallWeight}`).join("+");
 if(scalar(`SELECT COUNT(*) AS n FROM "命盤評分" WHERE ABS("綜合分"-ROUND(${overallExpr},2))>0.011`))throw new Error("overall score mismatch");
 
+const familyCount=scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分"');
+if(familyCount!==metadata.rowCount)throw new Error(`family rating row mismatch: ${familyCount}`);
+if(scalar('SELECT COUNT(*) AS n FROM "family_scores"')!==metadata.rowCount)throw new Error("family_scores view row mismatch");
+const timingAgeCount=FAMILY_CONFIG.marriageAgeRange[1]-FAMILY_CONFIG.marriageAgeRange[0]+1;
+const timingCount=scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機"');
+if(timingCount!==metadata.rowCount*timingAgeCount)throw new Error(`timing row mismatch: ${timingCount}`);
+if(scalar(`SELECT COUNT(*) AS n FROM "命盤婚育時機" t JOIN "命盤" m ON m."KEY"=t."KEY" WHERE t."年齡"<${FAMILY_CONFIG.marriageAgeRange[0]} OR t."年齡">${FAMILY_CONFIG.marriageAgeRange[1]} OR t."年份"<>m."年"+t."年齡"-1`))throw new Error("timing age/year offset mismatch");
+if(scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機" WHERE "年齡"<CAST(SUBSTR("大限範圍",1,INSTR("大限範圍",\'-\')-1) AS INTEGER) OR "年齡">CAST(SUBSTR("大限範圍",INSTR("大限範圍",\'-\')+1) AS INTEGER)'))throw new Error("age outside generated decadal range");
+if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "家庭品質全域百分位" IS NOT NULL'))throw new Error("global percentile must remain unavailable for a single-year artifact");
+for(const name of FAMILY_PERCENTILE_COMPONENTS)if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "${name}百分位"<0 OR "${name}百分位">100`))throw new Error(`${name} percentile out of range`);
+const positiveExpr='"父母財富分"*2+"父母品質分"*2.5+"自身財富分"*2.5+"外貌分"+"戀愛分"+"婚姻分"*2+"子女分"*2+"家庭時機分"*2';
+const familyRawExpr=`ROUND((${positiveExpr}-"父母負向分"*${FAMILY_CONFIG.parentsNegativePenaltyWeight})/15,2)`;
+if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE ABS("家庭品質原始分"-(${familyRawExpr}))>0.011 OR ABS("家庭品質分"-ROUND(MAX(0,MIN(100,${familyRawExpr})),2))>0.011`))throw new Error("family weighted score mismatch");
+const harmonicExpr='15.0/(2.0/MAX(1,"父母財富分")+2.5/MAX(1,"父母品質分")+2.5/MAX(1,"自身財富分")+1.0/MAX(1,"外貌分")+1.0/MAX(1,"戀愛分")+2.0/MAX(1,"婚姻分")+2.0/MAX(1,"子女分")+2.0/MAX(1,"家庭時機分"))';
+if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE ABS("家庭平衡分"-ROUND(MAX(0,MIN(100,${harmonicExpr}-"父母負向分"*${FAMILY_CONFIG.parentsNegativePenaltyWeight}/15.0)),2))>0.011`))throw new Error("family balance score mismatch");
+if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE ABS("自身財富分"-ROUND("穩定財富分"*${FAMILY_CONFIG.selfWealthWeights.stable}+"爆發財富分"*${FAMILY_CONFIG.selfWealthWeights.explosive},2))>0.011`))throw new Error("self wealth split mismatch");
+if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" f WHERE NOT EXISTS (SELECT 1 FROM "命盤婚育時機" t WHERE t."KEY"=f."KEY" AND t."年齡"=f."最佳婚姻年齡" AND t."年份"=f."最佳婚姻年份" AND t."婚姻觸發分"=f."婚姻時機分")'))throw new Error("best marriage timing metadata mismatch");
+if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" f WHERE f."父母負向分">=50 AND (SELECT COUNT(DISTINCT d."規則ID") FROM "命盤家庭評分明細" d WHERE d."KEY"=f."KEY" AND d."組件"=\'父母負向\')<2'))throw new Error("severe parent penalty triggered by fewer than two rules");
+
+const familySample=(order)=>rows(`SELECT m."KEY",m."公曆日期",m."時辰",m."性別",m."命宮主星",m."父母主星",m."子女主星",m."紫微星等",m."天府星等",m."太陰星等",f."家庭品質百分位",f."家庭平衡百分位",f."父母品質百分位",f."外貌百分位",f."婚姻百分位",f."子女百分位",f."父母負向分",f."最佳婚姻年齡",f."最佳婚姻年份",f."大限紅鸞",f."大限天喜",f."小限紅鸞",f."小限天喜",f."婚姻主要原因",f."子女主要原因" FROM "命盤" m JOIN "命盤家庭評分" f ON f."KEY"=m."KEY" ORDER BY ${order} LIMIT 10`);
+const regressionExtremes={
+  familyTop:familySample('f."家庭品質百分位" DESC'),familyBottom:familySample('f."家庭品質百分位" ASC'),
+  balanceTop:familySample('f."家庭平衡百分位" DESC'),balanceBottom:familySample('f."家庭平衡百分位" ASC'),
+  parentsTop:familySample('f."父母品質百分位" DESC'),parentsBottom:familySample('f."父母品質百分位" ASC'),
+  appearanceTop:familySample('f."外貌百分位" DESC'),appearanceBottom:familySample('f."外貌百分位" ASC'),
+  marriageTop:familySample('f."婚姻百分位" DESC'),marriageBottom:familySample('f."婚姻百分位" ASC'),
+  childrenTop:familySample('f."子女百分位" DESC'),childrenBottom:familySample('f."子女百分位" ASC'),
+};
+const parentPenaltyComparisons={
+  strongComponentsWeakParents:rows(`SELECT "KEY","家庭品質分","父母負向分","父母品質分","自身財富分","外貌分","婚姻分","子女分" FROM "命盤家庭評分" WHERE "父母負向分">0 ORDER BY ("自身財富分"+"外貌分"+"婚姻分"+"子女分") DESC,"父母負向分" DESC LIMIT 3`),
+  midComponentsStrongParents:rows(`SELECT "KEY","家庭品質分","父母負向分","父母品質分","自身財富分","外貌分","婚姻分","子女分" FROM "命盤家庭評分" WHERE "父母品質百分位">=80 ORDER BY ABS("自身財富百分位"-60)+ABS("外貌百分位"-60) LIMIT 3`),
+  allRoundTop:rows(`SELECT "KEY","家庭品質分","家庭平衡分","父母負向分","父母品質分","自身財富分","外貌分","婚姻分","子女分" FROM "命盤家庭評分" ORDER BY "家庭平衡百分位" DESC LIMIT 3`),
+};
+
 const badFire=scalar('SELECT COUNT(*) AS n FROM "命盤評分明細" d JOIN "命盤" m ON m."KEY"=d."KEY" WHERE d."規則ID"=\'SY-FIRE-GREED\' AND (m."貪狼宮位"<>\'財帛\' OR m."火星宮位"<>\'財帛\' OR m."財帛宮是否空宮"<>0 OR m."真財帛宮來源"<>\'本宮\')');
 const badBell=scalar('SELECT COUNT(*) AS n FROM "命盤評分明細" d JOIN "命盤" m ON m."KEY"=d."KEY" WHERE d."規則ID"=\'SY-BELL-GREED\' AND (m."貪狼宮位"<>\'財帛\' OR m."鈴星宮位"<>\'財帛\' OR m."財帛宮是否空宮"<>0 OR m."真財帛宮來源"<>\'本宮\')');
 if(badFire||badBell)throw new Error(`borrowed palace leaked into strict formations: fire=${badFire}, bell=${badBell}`);
@@ -77,5 +112,5 @@ const sampleKey=`${metadata.year}0810-子時-女`;
 const sample=rows(`SELECT m."KEY",m."命盤連結",m."命宮",m."身宮",m."空宮數",r."綜合分",r."綜合排名" FROM "命盤" m JOIN "命盤評分" r ON r."KEY"=m."KEY" WHERE m."KEY"='${sampleKey}'`)[0];
 if(!sample)throw new Error("required sample key not found");
 if(sample.命盤連結!==`https://metisziwei.com/chart?y=${metadata.year}&m=8&d=10&h=0&mi=0&g=f`)throw new Error(`unexpected sample chart link: ${sample.命盤連結}`);
-console.log(JSON.stringify({ok:true,...count,columns:schemaNames.size,tables:objects.size,missingRaw,invalidLinks,missingDaXian,brightnessRows:brightnessCount,ratingRows:scoreCount,strictFormationErrors:{fire:badFire,bell:badBell},brightnessRegression:regression,sample},null,2));
+console.log(JSON.stringify({ok:true,...count,columns:schemaNames.size,tables:objects.size,missingRaw,invalidLinks,missingDaXian,brightnessRows:brightnessCount,ratingRows:scoreCount,familyRows:familyCount,timingRows:timingCount,parentsNegativePenaltyWeight:FAMILY_CONFIG.parentsNegativePenaltyWeight,strictFormationErrors:{fire:badFire,bell:badBell},brightnessRegression:regression,parentPenaltyComparisons,regressionExtremes,sample},null,2));
 db.close();

@@ -17,7 +17,7 @@ const translateTop = (source) => {
 };
 const asObjects = (result) => result ? result.values.map((values) => Object.fromEntries(result.columns.map((column, index) => [column, values[index]]))) : [];
 const definitions = window.BAZI_QUERY_LIBRARY.definitions;
-if (definitions.length < 15 || definitions.length > 25) throw new Error(`query library must contain 15–25 entries, got ${definitions.length}`);
+if (definitions.length < 20 || definitions.length > 40) throw new Error(`query library must contain 20–40 entries, got ${definitions.length}`);
 const expectedHeader = ["KEY","命盤連結","公曆日期","時辰","性別"];
 const seen = new Set();
 const samples = {};
@@ -47,6 +47,9 @@ if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "overall_top") throw new Error("u
 for (const key of ["wealth_fire_greed","wealth_bell_greed","appearance_bright","health_bright_support","career_bright_leader","career_entrepreneur","social_bright","family_bright"]) {
   const sql = window.BAZI_QUERY_LIBRARY.queries[key];
   if (!/星曜亮度|星等/.test(sql)) throw new Error(`${key} does not use brightness`);
+}
+for(const key of ["family_best_overall","family_wealthy_parents_beautiful","family_marriage_children","family_best_parents","family_worst_parents","family_full_target"]){
+  if(!window.BAZI_QUERY_LIBRARY.queries[key]?.includes('JOIN "命盤家庭評分"'))throw new Error(`${key} does not use precomputed family scoring`);
 }
 const normalizedRows = count('SELECT COUNT(*) FROM "星曜亮度" WHERE "星曜"=\'貪狼\' AND "宮位"=\'財帛\' AND "亮度序">=(SELECT "亮度序" FROM "亮度等級" WHERE "亮度"=\'旺\')');
 if (!normalizedRows) throw new Error("normalized brightness comparison returned no rows");
