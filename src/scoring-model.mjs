@@ -221,6 +221,7 @@ function buildContext(chart) {
   const inPalace = (star, palace) => at(star)?.palace === palace;
   const inBranch = (star, branch) => byPalace.get(at(star)?.palace)?.branch === branch;
   const orderOf = (star) => brightnessOrder.get(at(star)?.brightness ?? "") ?? 0;
+  const isFallen = (star) => orderOf(star) > 0 && orderOf(star) <= 2;
   const samePalace = (...names) => {
     const palace = at(names[0])?.palace;
     return Boolean(palace) && names.every((name) => at(name)?.palace === palace);
@@ -238,7 +239,7 @@ function buildContext(chart) {
   const auxStars = ["左輔", "右弼", "天魁", "天鉞", "文昌", "文曲", "祿存"];
   const shaStars = ["擎羊", "陀羅", "火星", "鈴星", "地空", "地劫"];
   return {
-    chart, palaces, byPalace, byBranch, stars, at, inPalace, inBranch, orderOf, samePalace,
+    chart, palaces, byPalace, byBranch, stars, at, inPalace, inBranch, orderOf, isFallen, samePalace,
     siHua, mutagenPalace: (m) => siHua.get(m)?.palace ?? "", mutagenStar: (m) => siHua.get(m)?.name ?? "",
     mingBranch, neighbors, majorNames, straddle, threeWay, inThreeWay, friendName,
     auxStars, shaStars,
@@ -413,7 +414,7 @@ export const FORMATION_RULES = [
     (c) => c.samePalace("武曲", "七殺") && c.orderOf("武曲") <= 2 && c.orderOf("七殺") <= 2),
   formation("F-JICHU-XIONG", "吉處藏凶", "凶", "格局", -10, "吉星叢中煞星落陷",
     "命宮三方四正吉星成叢卻有煞星落陷：吉處藏凶，必凶",
-    (c) => c.threeWayAux.length >= 2 && c.threeWaySha.some((s) => c.orderOf(s) <= 2)),
+    (c) => c.threeWayAux.length >= 2 && c.threeWaySha.some((s) => c.isFallen(s))),
   formation("F-GUXING", "輔弼孤星", "凶", "格局", -6, "左輔／右弼",
     "左輔或右弼單星獨守命宮：主孤獨，輔助之才",
     (c) => !c.inPalace("紫微", "命宮") && (c.inPalace("左輔", "命宮") !== c.inPalace("右弼", "命宮"))),
@@ -435,8 +436,8 @@ export const FORMATION_RULES = [
     (c, gender) => gender === "女" && c.majorNames("命宮").some((name) => ["七殺", "破軍", "貪狼", "武曲"].includes(name))),
   formation("F-SHA-XIAN-MING", "命宮殺星落陷", "凶", "格局", -8, "廉貞貪狼擎羊陀羅",
     "廉貞貪狼落陷或擎羊陀羅落陷在命宮：容易犯偷竊罪，個性偏差",
-    (c) => c.majorNames("命宮").some((name) => ["廉貞", "貪狼"].includes(name) && c.orderOf(name) <= 2)
-      || ["擎羊", "陀羅"].some((name) => c.inPalace(name, "命宮") && c.orderOf(name) <= 2)),
+    (c) => c.majorNames("命宮").some((name) => ["廉貞", "貪狼"].includes(name) && c.isFallen(name))
+      || ["擎羊", "陀羅"].some((name) => c.inPalace(name, "命宮") && c.isFallen(name))),
   formation("F-FANSHUI", "泛水桃花", "凶", "格局", -4, "貪狼",
     "貪狼居亥子入命：桃花命；貪狼落陷主殺",
     (c) => c.inPalace("貪狼", "命宮") && (c.mingBranch === "亥" || c.mingBranch === "子")),
