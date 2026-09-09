@@ -11,6 +11,7 @@ if (!year || !/^\d{4}$/.test(year)) {
 }
 
 for (const [script, args] of [
+  ["scripts/verify-scoring-model.mjs", []],
   ["scripts/generate-data.mjs", [year]],
   ["scripts/verify-data.mjs", []],
   ["scripts/verify-queries.mjs", []],

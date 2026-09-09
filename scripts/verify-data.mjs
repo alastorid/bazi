@@ -3,7 +3,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
-import { BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG } from "../src/scoring-model.mjs";
+import { BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG, FORMATION_RULES } from "../src/scoring-model.mjs";
 import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
@@ -16,7 +16,7 @@ const scalar=(sql)=>rows(sql)[0]?.n??0;
 const count=rows('SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if(count.n!==metadata.rowCount||count.keys!==metadata.rowCount)throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
-for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","命盤家庭評分","命盤家庭評分明細","命盤婚育時機","family_scores"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
+for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","命盤格局","命盤家庭評分","命盤家庭評分明細","命盤婚育時機","family_scores"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
 
 const schemaNames=new Set(rows('PRAGMA table_info("命盤")').map((column)=>column.name));
 const specs=metadata.palaceSemantics;
@@ -63,6 +63,93 @@ for(const dimension of DIMENSIONS){
 const overallExpr=DIMENSIONS.map((dimension)=>`"${dimension}分"*${DIMENSION_CONFIG[dimension].overallWeight}`).join("+");
 if(scalar(`SELECT COUNT(*) AS n FROM "命盤評分" WHERE ABS("綜合分"-ROUND(${overallExpr},2))>0.011`))throw new Error("overall score mismatch");
 
+// ── 命盤格局：每一個具名格局旗標都必須與 命盤 原始欄位的 SQL 謂詞完全一致 ──
+// 命宮兩側一定是兄弟宮與父母宮（十二宮布名相對於命宮固定），所以夾命可直接用宮位名判斷。
+const straddle=(starA,starB)=>`((m."${starA}宮位"='兄弟' AND m."${starB}宮位"='父母') OR (m."${starA}宮位"='父母' AND m."${starB}宮位"='兄弟'))`;
+const TW="('命宮','財帛','官祿','遷移')";
+const BRIGHT=["'旺','廟'"],FALLEN=["'不','陷'"];
+const inPalace=(star,palace)=>`m."${star}宮位"='${palace}'`;
+const brightIn=(star,palace,list)=>`${inPalace(star,palace)} AND m."${star}星等" IN (${list.join(",")})`;
+const samePalace=(a,b)=>`m."${a}宮位"=m."${b}宮位"`;
+const palaceBranchColumns={命宮:"命宮地支",兄弟:"兄弟宮地支",夫妻:"夫妻宮地支",子女:"子女宮地支",財帛:"財帛宮地支",疾厄:"疾厄宮地支",遷移:"遷移宮地支",僕役:"交友宮地支",交友:"交友宮地支",官祿:"官祿宮地支",田宅:"田宅宮地支",福德:"福德宮地支",父母:"父母宮地支"};
+const inBranch=(star,branch)=>`(CASE m."${star}宮位" ${Object.entries(palaceBranchColumns).map(([palace,column])=>`WHEN '${palace}' THEN m."${column}"`).join(" ")} ELSE '' END)='${branch}'`;
+const auxNotInTW=["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`m."${star}宮位" NOT IN ${TW}`).join(" AND ");
+const huaNotInTW=["祿","權","科"].map((mutagen)=>`m."化${mutagen}宮位" NOT IN ${TW}`).join(" AND ");
+const warlordInMing=(gender,bright)=>`${gender} AND (${["七殺","破軍","貪狼","武曲"].map((star)=>bright?brightIn(star,"命宮",BRIGHT):inPalace(star,"命宮")).join(" OR ")})`;
+const lianPair=(pair,bright)=>`${samePalace(...pair)} AND ${pair.map((star)=>bright?`m."${star}星等" IN (${BRIGHT})`:`m."${star}星等" IN (${FALLEN})`).join(" AND ")}`;
+
+const formationPredicates={
+  "紫府坐垣":`m."命宮" IN ('寅','申') AND ${brightIn("紫微","命宮",BRIGHT)} AND ${brightIn("天府","命宮",BRIGHT)}`,
+  "七殺朝斗":`m."命宮" IN ('寅','申') AND ${brightIn("七殺","命宮",BRIGHT)} AND m."命宮主星"='七殺'`,
+  "日月並明":`((m."命宮" IN ('辰','戌') AND ${inBranch("太陽","辰")} AND ${inBranch("太陰","戌")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})) OR (m."命宮"='丑' AND ${inBranch("太陽","巳")} AND ${inBranch("太陰","酉")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})))`,
+  "月朗天門":`m."命宮"='亥' AND ${brightIn("太陰","命宮",BRIGHT)}`,
+  "日照雷門":`m."命宮"='卯' AND ${brightIn("太陽","命宮",BRIGHT)}`,
+  "日麗中天":`m."命宮"='午' AND ${brightIn("太陽","命宮",BRIGHT)}`,
+  "明珠出海":`m."命宮"='未' AND ${inBranch("太陰","亥")} AND ${inBranch("太陽","卯")} AND m."太陰星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
+  "日月夾命":`m."命宮主星"<>'' AND ${straddle("太陽","太陰")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})`,
+  "紫府夾權":straddle("紫微","天府"),
+  "魁鉞夾貴":straddle("天魁","天鉞"),
+  "科權祿三會命":`m."化祿宮位" IN ${TW} AND m."化權宮位" IN ${TW} AND m."化科宮位" IN ${TW}`,
+  "權祿相逢":`m."化權宮位" IN ('命宮','財帛','官祿') AND (m."化祿宮位"=m."化權宮位" OR m."祿存宮位"=m."化權宮位")`,
+  "祿馬交馳":`(m."化祿宮位"=m."天馬宮位" OR m."祿存宮位"=m."天馬宮位")`,
+  "府相朝垣":`(${inPalace("天府","財帛")} AND ${inPalace("天相","官祿")}) OR (${inPalace("天府","官祿")} AND ${inPalace("天相","財帛")})`,
+  "火貴格":`${inPalace("火星","命宮")} AND m."貪狼星等" NOT IN (${FALLEN}) AND ${inPalace("貪狼","命宮")}`,
+  "鈴貴格":`${inPalace("鈴星","命宮")} AND m."貪狼星等" NOT IN (${FALLEN}) AND ${inPalace("貪狼","命宮")}`,
+  "英星入廟":`m."命宮" IN ('子','午') AND ${brightIn("破軍","命宮",BRIGHT)}`,
+  "水澄桂萼":`m."命宮"='子' AND ${brightIn("太陰","命宮",BRIGHT)}`,
+  "巨日同宮":`${inPalace("巨門","命宮")} AND m."巨門星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
+  "巨日會命":`m."巨門宮位" IN ${TW} AND m."太陽宮位" IN ${TW} AND m."巨門宮位"<>m."太陽宮位" AND m."巨門星等" IN (${BRIGHT}) AND m."太陽星等" IN (${BRIGHT})`,
+  "命帶祿":`m."化祿宮位"='命宮' OR ${inPalace("祿存","命宮")}`,
+  "紫微得輔":`${inPalace("紫微","命宮")} AND (m."左輔宮位" IN ${TW} OR m."右弼宮位" IN ${TW})`,
+  "機月同梁":`m."天機宮位" IN ${TW} AND m."天梁宮位" IN ${TW} AND m."太陰宮位" IN ${TW} AND m."天同宮位" IN ${TW}`,
+  "紫微七殺官祿":`${inPalace("紫微","官祿")} AND ${inPalace("七殺","官祿")}`,
+  "日月夾財":`m."命宮主星"='' AND ${straddle("太陽","太陰")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})`,
+  "凶處藏吉":`((m."擎羊宮位" IN ${TW}) OR (m."陀羅宮位" IN ${TW}) OR (m."火星宮位" IN ${TW}) OR (m."鈴星宮位" IN ${TW}) OR (m."地空宮位" IN ${TW}) OR (m."地劫宮位" IN ${TW})) AND NOT ((m."擎羊宮位" IN ${TW} AND m."擎羊星等" IN (${FALLEN})) OR (m."陀羅宮位" IN ${TW} AND m."陀羅星等" IN (${FALLEN})) OR (m."火星宮位" IN ${TW} AND m."火星星等" IN (${FALLEN})) OR (m."鈴星宮位" IN ${TW} AND m."鈴星星等" IN (${FALLEN})) OR (m."地空宮位" IN ${TW} AND m."地空星等" IN (${FALLEN})) OR (m."地劫宮位" IN ${TW} AND m."地劫星等" IN (${FALLEN}))) AND (${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>brightIn(star,"命宮",BRIGHT)).join(" OR ")})`,
+  "廉殺廟旺":lianPair(["廉貞","七殺"],true),
+  "昌曲會命":`m."文昌宮位" IN ${TW} AND m."文曲宮位" IN ${TW}`,
+  "魁鉞會命":`m."天魁宮位" IN ${TW} AND m."天鉞宮位" IN ${TW}`,
+  "紫輔同夫":`${inPalace("紫微","夫妻")} AND ${inPalace("左輔","夫妻")} AND ${inPalace("右弼","夫妻")}`,
+  "天府天馬同夫":`${inPalace("天府","夫妻")} AND ${inPalace("天馬","夫妻")}`,
+  "天同巨門同夫":`${inPalace("天同","夫妻")} AND ${inPalace("巨門","夫妻")}`,
+  "男命武官坐命":warlordInMing("m.\"性別\"='男'",true),
+  "身在財帛":`m."身宮宮位"='財帛'`,
+  "身在官祿":`m."身宮宮位"='官祿'`,
+  "半空折翅":`m."化忌宮位"='遷移' AND ${auxNotInTW} AND ${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>`NOT (m."${star}宮位" IN ${TW} AND m."${star}星等" IN ('得','旺','廟'))`).join(" AND ")} AND ${huaNotInTW}`,
+  "廉貪陷沖命":`m."命宮" IN ('巳','亥') AND ${inPalace("廉貞","遷移")} AND ${inPalace("貪狼","遷移")} AND m."廉貞星等" IN (${FALLEN}) AND m."貪狼星等" IN (${FALLEN})`,
+  "日月反背":`m."太陽星等" IN (${FALLEN}) AND m."太陰星等" IN (${FALLEN})`,
+  "日月反背夾命":`${straddle("太陽","太陰")} AND m."太陽星等" IN (${FALLEN}) AND m."太陰星等" IN (${FALLEN})`,
+  "羊陀夾命":straddle("擎羊","陀羅"),
+  "廉殺落陷":lianPair(["廉貞","七殺"],false),
+  "廉破入夫妻福德":`${samePalace("廉貞","破軍")} AND m."廉貞宮位" IN ('夫妻','福德')`,
+  "廉貪入夫妻福德":`${samePalace("廉貞","貪狼")} AND m."廉貞宮位" IN ('夫妻','福德')`,
+  "廉貪落陷":lianPair(["廉貞","貪狼"],false),
+  "武殺落陷":lianPair(["武曲","七殺"],false),
+  "吉處藏凶":`((${["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`m."${star}宮位" IN ${TW}`).join(")+(")}))>=2 AND ((${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>`(m."${star}宮位" IN ${TW} AND m."${star}星等" IN (${FALLEN}))`).join(" OR ")}))`,
+  "輔弼孤星":`m."紫微宮位"<>'命宮' AND ((m."左輔宮位"='命宮')+(m."右弼宮位"='命宮'))=1`,
+  "紫微無輔":`${inPalace("紫微","命宮")} AND m."左輔宮位" NOT IN ${TW} AND m."右弼宮位" NOT IN ${TW}`,
+  "殺破狼會命":`${["七殺","破軍","貪狼"].map((star)=>`m."${star}宮位" IN ${TW}`).join(" AND ")}`,
+  "七殺臨身":`m."身宮宮位"<>'' AND m."七殺宮位"=m."身宮宮位"`,
+  "子女無子":`m."子女宮是否空宮"=1 AND m."化忌宮位"='田宅'`,
+  "女命武官坐命":warlordInMing("m.\"性別\"='女'",false),
+  "命宮殺星落陷":`((${inPalace("廉貞","命宮")} AND m."廉貞星等" IN (${FALLEN})) OR (${inPalace("貪狼","命宮")} AND m."貪狼星等" IN (${FALLEN})) OR (${inPalace("擎羊","命宮")} AND m."擎羊星等" IN (${FALLEN})) OR (${inPalace("陀羅","命宮")} AND m."陀羅星等" IN (${FALLEN})))`,
+  "泛水桃花":`${inPalace("貪狼","命宮")} AND m."命宮" IN ('亥','子')`,
+  "女命太陽陷":`m."性別"='女' AND m."太陽宮位" IN ('命宮','夫妻') AND m."太陽星等" IN (${FALLEN})`,
+  "福德武曲七殺":`m."性別"='女' AND ${inPalace("武曲","福德")} AND ${inPalace("七殺","福德")}`,
+  "太陽陷父母":`${inPalace("太陽","父母")} AND m."太陽星等" IN (${FALLEN})`,
+  "太陰陷父母":`${inPalace("太陰","父母")} AND m."太陰星等" IN (${FALLEN})`,
+};
+
+const formationCount=scalar('SELECT COUNT(*) AS n FROM "命盤格局"');
+if(formationCount!==metadata.rowCount)throw new Error(`formation row mismatch: ${formationCount}`);
+const formationChecks={};
+for(const item of FORMATION_RULES){
+  if(!(item.name in formationPredicates))throw new Error(`missing independent SQL predicate for formation: ${item.name}`);
+  const mismatch=scalar(`SELECT COUNT(*) AS n FROM "命盤" m JOIN "命盤格局" g ON g."KEY"=m."KEY" WHERE g."${item.name}"<>CASE WHEN (${formationPredicates[item.name]}) THEN 1 ELSE 0 END`);
+  if(mismatch)throw new Error(`formation flag mismatch for ${item.name}: ${mismatch} rows`);
+  formationChecks[item.name]=scalar(`SELECT COUNT(*) AS n FROM "命盤格局" WHERE "${item.name}"=1`);
+}
+if(scalar(`SELECT COUNT(*) AS n FROM "命盤格局" WHERE "成格數"<>${FORMATION_RULES.filter((item)=>item.polarity==="吉").map((item)=>`"${item.name}"`).join("+")} OR "凶格數"<>${FORMATION_RULES.filter((item)=>item.polarity==="凶").map((item)=>`"${item.name}"`).join("+")}`))throw new Error("成格數/凶格數 do not match formation flags");
+
 const familyCount=scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分"');
 if(familyCount!==metadata.rowCount)throw new Error(`family rating row mismatch: ${familyCount}`);
 if(scalar('SELECT COUNT(*) AS n FROM "family_scores"')!==metadata.rowCount)throw new Error("family_scores view row mismatch");
@@ -97,20 +184,19 @@ const parentPenaltyComparisons={
   allRoundTop:rows(`SELECT "KEY","家庭品質分","家庭平衡分","父母負向分","父母品質分","自身財富分","外貌分","婚姻分","子女分" FROM "命盤家庭評分" ORDER BY "家庭平衡百分位" DESC LIMIT 3`),
 };
 
-const badFire=scalar('SELECT COUNT(*) AS n FROM "命盤評分明細" d JOIN "命盤" m ON m."KEY"=d."KEY" WHERE d."規則ID"=\'SY-FIRE-GREED\' AND (m."貪狼宮位"<>\'財帛\' OR m."火星宮位"<>\'財帛\' OR m."財帛宮是否空宮"<>0 OR m."真財帛宮來源"<>\'本宮\')');
-const badBell=scalar('SELECT COUNT(*) AS n FROM "命盤評分明細" d JOIN "命盤" m ON m."KEY"=d."KEY" WHERE d."規則ID"=\'SY-BELL-GREED\' AND (m."貪狼宮位"<>\'財帛\' OR m."鈴星宮位"<>\'財帛\' OR m."財帛宮是否空宮"<>0 OR m."真財帛宮來源"<>\'本宮\')');
-if(badFire||badBell)throw new Error(`borrowed palace leaked into strict formations: fire=${badFire}, bell=${badBell}`);
+const legacyWealthRules=scalar('SELECT COUNT(*) AS n FROM "評分規則" WHERE "規則ID" IN (\'F-HUTAN-CAI\',\'F-LINGTAN-CAI\',\'FEW-FIRE-GREED\',\'FEW-BELL-GREED\')');
+if(legacyWealthRules)throw new Error("legacy 火貪／鈴貪 wealth rules remain in Ni scoring");
 
 const regression=[];
-for(const rule of ["W-WU","W-TAN","A-YIN","C-SHA","H-HUO"]){
+for(const rule of ["W-WU","W-TAN","C-SUN","H-HUO","M-ZI"]){
   const pair=rows(`SELECT lo."KEY" AS lowKey,lo."星曜" AS star,lo."宮位" AS palace,lo."亮度" AS lowBrightness,lo."亮度序" AS lowOrder,lo."實際貢獻" AS lowContribution,hi."KEY" AS highKey,hi."亮度" AS highBrightness,hi."亮度序" AS highOrder,hi."實際貢獻" AS highContribution FROM "命盤評分明細" lo JOIN "命盤評分明細" hi ON hi."規則ID"=lo."規則ID" AND hi."星曜"=lo."星曜" AND hi."宮位"=lo."宮位" AND hi."亮度序">lo."亮度序" WHERE lo."規則ID"='${rule}' AND hi."實際貢獻"<>lo."實際貢獻" ORDER BY hi."亮度序"-lo."亮度序" DESC LIMIT 1`)[0];
   if(pair)regression.push({rule,...pair});
 }
 if(regression.length<3)throw new Error(`expected >=3 brightness regression pairs, got ${regression.length}`);
 
 const sampleKey=`${metadata.year}0810-子時-女`;
-const sample=rows(`SELECT m."KEY",m."命盤連結",m."命宮",m."身宮",m."空宮數",r."綜合分",r."綜合排名" FROM "命盤" m JOIN "命盤評分" r ON r."KEY"=m."KEY" WHERE m."KEY"='${sampleKey}'`)[0];
+const sample=rows(`SELECT m."KEY",m."命盤連結",m."命宮",m."身宮",m."空宮數",r."綜合分",r."綜合排名",r."格局分",g."成格數",g."凶格數" FROM "命盤" m JOIN "命盤評分" r ON r."KEY"=m."KEY" JOIN "命盤格局" g ON g."KEY"=m."KEY" WHERE m."KEY"='${sampleKey}'`)[0];
 if(!sample)throw new Error("required sample key not found");
 if(sample.命盤連結!==`https://metisziwei.com/chart?y=${metadata.year}&m=8&d=10&h=0&mi=0&g=f`)throw new Error(`unexpected sample chart link: ${sample.命盤連結}`);
-console.log(JSON.stringify({ok:true,...count,columns:schemaNames.size,tables:objects.size,missingRaw,invalidLinks,missingDaXian,brightnessRows:brightnessCount,ratingRows:scoreCount,familyRows:familyCount,timingRows:timingCount,parentsNegativePenaltyWeight:FAMILY_CONFIG.parentsNegativePenaltyWeight,strictFormationErrors:{fire:badFire,bell:badBell},brightnessRegression:regression,parentPenaltyComparisons,regressionExtremes,sample},null,2));
+console.log(JSON.stringify({ok:true,...count,columns:schemaNames.size,tables:objects.size,missingRaw,invalidLinks,missingDaXian,brightnessRows:brightnessCount,ratingRows:scoreCount,familyRows:familyCount,timingRows:timingCount,parentsNegativePenaltyWeight:FAMILY_CONFIG.parentsNegativePenaltyWeight,legacyWealthRules,formationChecks,brightnessRegression:regression,parentPenaltyComparisons,regressionExtremes,sample},null,2));
 db.close();

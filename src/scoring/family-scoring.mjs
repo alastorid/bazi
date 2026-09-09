@@ -10,7 +10,11 @@ const round = (value) => Math.round(value * 100) / 100;
 const safe = (value) => Math.max(1, value);
 const brightnessOrder = new Map(BRIGHTNESS_LEVELS);
 
-export function scoreFamily(chart, coreScores) {
+// 倪師女命標準：女命武官星（殺破狼武曲）坐命主孤獨；福德宮最重，福德凶沖夫妻
+// 主生離死別；子女宮空宮對宮化忌主無子。
+const FEMALE_WARLORD_STARS = ["七殺", "破軍", "貪狼", "武曲"];
+
+export function scoreFamily(chart, gender = "男") {
   const palaces = new Map(chart.palaces.map((palace) => [palace.name, palace]));
   const stars = chart.palaces.flatMap((palace) => palace.stars.map((star) => ({ ...star, palace: palace.name })));
   const byName = new Map(stars.map((star) => [star.name, star]));
@@ -30,13 +34,15 @@ export function scoreFamily(chart, coreScores) {
   };
   const palaceStars = (name) => palaces.get(name)?.stars ?? [];
   const mutation = (name) => stars.find((star) => star.siHua === name);
+  const samePalace = (...names) => names.every((name) => byName.get(name)?.palace && byName.get(name)?.palace === byName.get(names[0])?.palace);
+  const inThreeWay = (name) => ["命宮", "財帛", "官祿", "遷移"].includes(byName.get(name)?.palace);
 
   let parents = 38;
   for (const [star, base] of [["紫微",8],["天府",9],["太陽",7],["太陰",7],["天梁",7],["天相",6]]) parents += applyStar("父母", `FP-${star}`, star, ["父母"], base, `${star}在父母宮的支持作用`);
   for (const star of SUPPORT_STARS) if (palaceStars("父母").some((item) => item.name === star)) { parents += 3; addEvidence("父母",`FP-S-${star}`,"吉曜",3,3,`${star}在父母宮`); }
-  if (mutation("祿")?.palace === "父母") { parents += 10; addEvidence("父母","FP-H-LU","四化",10,10,"化祿進父母宮",mutation("祿")); }
+  if (mutation("祿")?.palace === "父母") { parents += 10; addEvidence("父母","FP-H-LU","四化",10,10,"化祿進父母宮，有祖產財祿",mutation("祿")); }
   if (mutation("科")?.palace === "父母") { parents += 5; addEvidence("父母","FP-H-KE","四化",5,5,"化科進父母宮",mutation("科")); }
-  if (mutation("忌")?.palace === "父母") { parents -= 10; addEvidence("父母","FP-H-JI","四化",-10,-10,"化忌進父母宮",mutation("忌")); }
+  if (mutation("忌")?.palace === "父母") { parents -= 10; addEvidence("父母","FP-H-JI","四化",-10,-10,"化忌進父母宮，父母不在身邊",mutation("忌")); }
   parents = clamp(parents);
 
   let parentsWealth = 34;
@@ -63,19 +69,37 @@ export function scoreFamily(chart, coreScores) {
   if (["財帛","官祿","田宅"].includes(mutation("忌")?.palace)) { stableWealth-=12; addEvidence("穩定財富","FSW-JI","四化",-12,-12,`化忌進${mutation("忌").palace}`,mutation("忌")); }
   stableWealth = clamp(stableWealth);
 
+  // 欄名為了資料庫相容仍保留「爆發財富」，內容則完全改用《天紀》明示的
+  // 橫財／巨富條件；不再把舊模型的財帛火貪、鈴貪或殺破狼當成爆發財。
   let explosiveWealth = 25;
-  explosiveWealth += applyStar("爆發財富","FEW-TAN","貪狼",["財帛","官祿","遷移"],7,"貪狼的機會財作用");
-  explosiveWealth += applyStar("爆發財富","FEW-PO","破軍",["財帛","官祿"],6,"破軍的重組與爆發作用");
-  explosiveWealth += applyStar("爆發財富","FEW-SHA","七殺",["財帛","官祿"],5,"七殺的高風險開創作用");
-  const greed=byName.get("貪狼"),fire=byName.get("火星"),bell=byName.get("鈴星");
-  if (greed?.palace==="財帛" && fire?.palace==="財帛") { const f=(brightnessFactor("貪狼",greed.brightness,18)+brightnessFactor("火星",fire.brightness,18))/2,v=round(18*f); explosiveWealth+=v; addEvidence("爆發財富","FEW-FIRE-GREED","嚴格同宮組合",18,v,"火貪實際同坐財帛",greed); }
-  if (greed?.palace==="財帛" && bell?.palace==="財帛") { const f=(brightnessFactor("貪狼",greed.brightness,16)+brightnessFactor("鈴星",bell.brightness,16))/2,v=round(16*f); explosiveWealth+=v; addEvidence("爆發財富","FEW-BELL-GREED","嚴格同宮組合",16,v,"鈴貪實際同坐財帛",greed); }
+  explosiveWealth += applyStar("爆發財富","FEW-SUN","太陽",["財帛"],7,"太陽在財帛主橫財（非固定收入）");
+  const sun=byName.get("太陽"),giant=byName.get("巨門"),horse=byName.get("天馬"),lu=byName.get("祿存");
+  if(inThreeWay("太陽")&&inThreeWay("巨門")&&brightnessOrder.get(sun?.brightness)>=6&&brightnessOrder.get(giant?.brightness)>=6){
+    explosiveWealth+=18;addEvidence("爆發財富","FEW-JURI","倪師具名格局",18,18,"巨日廟旺會命：大生意人、巨富",giant);
+  }
+  if(horse?.palace&&(horse.palace===lu?.palace||horse.palace===mutation("祿")?.palace)){
+    explosiveWealth+=12;addEvidence("爆發財富","FEW-LUMA","倪師具名格局",12,12,"祿存或化祿與天馬同宮：祿馬交馳，辛苦賺大錢",horse);
+  }
+  const powerPalace=mutation("權")?.palace;
+  if(["命宮","財帛","官祿"].includes(powerPalace)&&(mutation("祿")?.palace===powerPalace||lu?.palace===powerPalace)){
+    explosiveWealth+=10;addEvidence("爆發財富","FEW-QUANLU","倪師具名格局",10,10,"權祿相逢於命財官：自己做事業當老闆",mutation("權"));
+  }
   explosiveWealth = clamp(explosiveWealth);
   const selfWealth = clamp(stableWealth*FAMILY_CONFIG.selfWealthWeights.stable + explosiveWealth*FAMILY_CONFIG.selfWealthWeights.explosive);
 
-  let appearance = Number(coreScores.外貌 ?? 50);
+  // 外貌：倪師「太陰坐命女子漂亮」等星象，外貌不再是核心維度，只在家庭評分內部計算。
+  let appearance = 40;
+  const mingStars = palaceStars("命宮");
+  for (const [star, base] of [["太陰",8],["天同",6],["天相",6],["紫微",5],["貪狼",5],["廉貞",4],["文昌",3],["文曲",3]]) {
+    appearance += applyStar("外貌",`FA-${star}`,star,["命宮"],base,`${star}在命宮的清秀／氣質作用`);
+  }
   const bodyPalace = chart.bodyPalaceName;
   for (const star of APPEARANCE_STARS) appearance += applyStar("外貌",`FA-BODY-${star}`,star,[bodyPalace],2.5,`${star}在身宮宮位的外貌／氣質輔助`);
+  for (const star of mingStars) {
+    if (CHALLENGING_STARS.includes(star.name) && ["不","陷"].includes(star.brightness)) {
+      appearance -= 4; addEvidence("外貌","FA-SHA-FALLEN","煞星落陷",-4,-4,`${star.name}${star.brightness}在命宮折損氣質`,star);
+    }
+  }
   appearance = clamp(appearance);
 
   let romance = 34;
@@ -101,7 +125,18 @@ export function scoreFamily(chart, coreScores) {
     const value=round(base*brightnessFactor(star.name,star.brightness,base)); marriageNatal+=value; addEvidence("婚姻",`FM-${star.name}`,"夫妻主星亮度",base,value,`${star.name}在夫妻宮`,{...star,palace:"夫妻"});
   }
   for(const star of SUPPORT_STARS) if(palaceStars("夫妻").some((s)=>s.name===star)){marriageNatal+=3;addEvidence("婚姻",`FM-S-${star}`,"吉曜",3,3,`${star}在夫妻宮`);}
-  if(mutation("忌")?.palace==="夫妻"){marriageNatal-=13;addEvidence("婚姻","FM-JI","四化",-13,-13,"化忌進夫妻宮",mutation("忌"));}
+  if(mutation("忌")?.palace==="夫妻"){marriageNatal-=13;addEvidence("婚姻","FM-JI","四化",-13,-13,"化忌進夫妻宮，為婚姻重大不利訊號",mutation("忌"));}
+  // 福德宮與夫妻宮一起看：福德凶（化忌／廉破／廉貪）主夫妻不能長久。
+  if(mutation("忌")?.palace==="福德"){marriageNatal-=10;addEvidence("婚姻","FM-FUDE-JI","四化",-10,-10,"化忌進福德宮：福德與婚姻不利，須與命運、陽宅及面相同參",mutation("忌"));}
+  const fudeNames=palaceStars("福德").filter((s)=>s.type==="major").map((s)=>s.name);
+  if(fudeNames.includes("廉貞")&&(fudeNames.includes("破軍")||fudeNames.includes("貪狼"))){
+    marriageNatal-=9;addEvidence("婚姻","FM-FUDE-LIANX","凶格",-9,-9,"福德宮廉貞破軍／廉貞貪狼：婚姻重大不利訊號，須與命運、陽宅及面相同參");
+  }
+  // 倪師：女命武官星（殺破狼武曲）坐命，女身男命，婚姻孤獨訊號。
+  const mingMajorNames=palaceStars("命宮").filter((s)=>s.type==="major").map((s)=>s.name);
+  if(gender==="女"&&mingMajorNames.some((name)=>FEMALE_WARLORD_STARS.includes(name))){
+    marriageNatal-=8;addEvidence("婚姻","FM-NV-WUGUAN","女命武官",-8,-8,"女命武官星坐命：女身男命，婚姻孤獨訊號");
+  }
   const marriage=clamp(marriageNatal*0.62+bestMarriageTiming*0.38);
 
   const childPalace=palaces.get("子女");
@@ -116,8 +151,9 @@ export function scoreFamily(chart, coreScores) {
   }
   for(const star of SUPPORT_STARS) if(palaceStars("子女").some((s)=>s.name===star)){childStrength+=3;addEvidence("真子女宮強度",`FC-S-${star}`,"吉曜",3,3,`${star}在子女宮`);}
   for(const star of CHALLENGING_STARS) if(palaceStars("子女").some((s)=>s.name===star)){childStrength-=4;addEvidence("真子女宮強度",`FC-N-${star}`,"煞耗",-4,-4,`${star}在子女宮`);}
-  if(mutation("祿")?.palace==="子女"){childStrength+=8;addEvidence("真子女宮強度","FC-LU","四化",8,8,"化祿進子女宮",mutation("祿"));}
-  if(mutation("忌")?.palace==="子女"){childStrength-=10;addEvidence("真子女宮強度","FC-JI","四化",-10,-10,"化忌進子女宮",mutation("忌"));}
+  if(mutation("祿")?.palace==="子女"){childStrength+=8;addEvidence("真子女宮強度","FC-LU","四化",8,8,"化祿進子女宮：兒子優秀",mutation("祿"));}
+  if(mutation("忌")?.palace==="子女"){childStrength-=10;addEvidence("真子女宮強度","FC-JI","四化",-10,-10,"化忌進子女宮：與子女衝突大",mutation("忌"));}
+  if(borrowed&&mutation("忌")?.palace==="田宅"){childStrength-=8;addEvidence("真子女宮強度","FC-WUZI","凶格",-8,-8,"子女宮空宮且對宮化忌：代表無子");}
   childStrength=clamp(childStrength);
   const children=clamp(childStrength*0.63+bestChildrenTiming*0.37);
 

@@ -14,6 +14,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - Four transformation star/palace pairs: `化祿`, `化權`, `化科`, `化忌`.
 - Direct columns for `命宮`, `身宮`, and `身宮宮位`.
 - First-class 空宮 data for every palace: empty flag, opposite palace and stars, effective borrowed stars, and provenance.
+- A direct terrestrial-branch column for every palace, used to verify branch-specific formations such as 日月並明 and 明珠出海.
 - `空宮數` for direct multi-empty-palace research. See [PALACE_SEMANTICS.md](PALACE_SEMANTICS.md).
 - A normalized `星曜亮度` table and ordinal `亮度等級` lookup for direct SQL comparisons.
 - Separate `命盤評分`, `命盤評分明細`, and `評分規則` tables; scores, annual percentiles, grades, and every contributing rule remain inspectable without changing the raw `命盤` table.
@@ -33,7 +34,7 @@ Serve `dist/` through an HTTP server. Do not open `index.html` directly because 
 
 `build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮／身宮, all 12 opposite-palace mappings, empty-palace borrowing, normalized brightness, score reconciliation, brightness regression pairs, and every sample query.
 
-Brightness is an input to the scoring engine rather than a display-only label. Its response depends on the star's nature, the signed palace-specific rule, four-transformation context, and strict same-palace synergies. See [SCORING.md](SCORING.md).
+Brightness is an input to the scoring engine rather than a display-only label. Its response depends on the star's nature, the signed palace-specific rule, four-transformation context, and named formations. See [SCORING.md](SCORING.md) and the source boundary in [NIHAIXIA_SCORING.md](NIHAIXIA_SCORING.md).
 
 The Results pane also contains a Visualization tab with a month-by-24-hour PR heatmap, metric and ranking selectors, minimum filters, Top Times, score breakdowns, rule explanations, and direct Metis links. Because the source database uses the traditional twelve two-hour periods, adjacent clock-hour cells may intentionally point to the same chart; gender is selected separately.
 

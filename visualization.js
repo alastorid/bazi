@@ -5,8 +5,8 @@
     parents:["Parents Quality","父母品質百分位"], parentsWealth:["Parents Wealth","父母財富百分位"],
     selfWealth:["Self Wealth","自身財富百分位"], appearance:["Appearance","外貌百分位"],
     romance:["Romance","戀愛百分位"], marriage:["Marriage","婚姻百分位"], children:["Children","子女百分位"],
-    wealth:["Wealth","核心財富百分位"], luck:["Luck","幸運百分位"], health:["Health","健康百分位"],
-    career:["Career","事業百分位"], overall:["Overall","綜合百分位"],
+    geju:["Formation","格局百分位"], wealth:["Wealth","財富百分位"], career:["Career","事業百分位"],
+    kin:["Kinship","六親百分位"], exam:["Academic","科甲百分位"], health:["Health","健康百分位"], overall:["Overall","綜合百分位"],
   };
   const FILTERS = [["父母品質百分位","Parents"],["自身財富百分位","Wealth"],["外貌百分位","Appearance"],["婚姻百分位","Marriage"],["子女百分位","Children"]];
   const esc=(v)=>String(v??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
@@ -49,7 +49,7 @@
     const sql=`SELECT m."KEY",m."公曆日期",m."日",m."時辰",m."時辰序號",m."性別",m."命盤連結",m."命宮主星",m."父母主星",m."子女主星",m."真子女宮主星",
       f."家庭品質百分位",f."家庭平衡百分位",f."父母品質百分位",f."父母財富百分位",f."自身財富百分位",f."外貌百分位",f."戀愛百分位",f."婚姻百分位",f."子女百分位",
       f."父母負向分",f."最佳婚姻年齡",f."最佳婚姻年份",f."婚姻窗口起始年齡",f."婚姻窗口結束年齡",f."真子女宮有主星",f."真子女宮來源",f."婚姻主要原因",f."子女主要原因",
-      r."財富百分位" AS "核心財富百分位",r."幸運百分位",r."健康百分位",r."事業百分位",r."綜合百分位"
+      r."格局百分位",r."財富百分位",r."事業百分位",r."六親百分位",r."科甲百分位",r."健康百分位",r."綜合百分位"
       FROM "命盤" m JOIN "命盤家庭評分" f ON f."KEY"=m."KEY" JOIN "命盤評分" r ON r."KEY"=m."KEY"
       WHERE m."年"=${state.year} AND m."月"=${state.month} AND m."性別"='${state.gender}' ORDER BY m."日",m."時辰序號";`;
     const result=await state.query(sql);state.rows=result.rows;state.loaded=true;state.selected=null;render();

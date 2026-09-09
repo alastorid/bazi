@@ -38,7 +38,7 @@ The family scorer uses the same context-sensitive response curves as the core sc
 - Parents Wealth: wealth/resource stars in 父母 or 田宅 plus transformations.
 - Parents Negative: number of challenging stars, fallen major stars, 化忌, and compound conditions. Severe risk requires multiple rule families; a single star cannot create the full penalty.
 - Stable Wealth: wealth, career, life, and property palaces; 財庫 stars, 祿存, transformations, brightness, and core disruption.
-- Explosive Wealth: 貪狼、破軍、七殺 and strict original-palace 火貪／鈴貪 synergies. Borrowed palaces do not form these patterns.
+- Explosive Wealth (compatibility column name): only source-backed 《天紀》 wealth patterns—太陽入財帛（橫財）、廟旺巨日會命、祿馬交馳、權祿相逢. The previous 財帛火貪／鈴貪 and generic 殺破狼 bonuses were removed from scoring.
 - Self Wealth: `78% stable + 22% explosive`, configured independently.
 - Appearance: the existing brightness-aware appearance score plus lower-weight body-palace effects.
 - Romance: 紅鸞、天喜、天姚、咸池、貪狼、廉貞 in relationship-relevant palaces; this is independent of appearance.

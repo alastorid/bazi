@@ -6,8 +6,9 @@ import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { generateChart, HOURS, GENDERS } from "../src/ziwei-algorithm.mjs";
 import {
-  BRIGHTNESS_LEVELS, CONTEXT_RULES, DIMENSIONS, DIMENSION_CONFIG,
-  RANK_THRESHOLDS, STAR_NATURE, STAR_RULES, scoreChart,
+  BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG,
+  FORMATION_RULES, RANK_THRESHOLDS, STAR_NATURE, STAR_RULES,
+  TRANSFORM_RULES, scoreChart,
 } from "../src/scoring-model.mjs";
 import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
 import { scoreFamily } from "../src/scoring/family-scoring.mjs";
@@ -105,6 +106,7 @@ const palaceColumns = palaces.flatMap((palace) => [
   [`${palace}大限`, "TEXT"],
 ]);
 const semanticColumns = palaceSpecs.flatMap(({ label }) => [
+  [`${label}地支`, "TEXT NOT NULL"],
   [`${label}是否空宮`, "INTEGER NOT NULL"],
   [`${label}對宮`, "TEXT NOT NULL"],
   [`${label}對宮主星`, "TEXT NOT NULL"],
@@ -134,6 +136,13 @@ brightnessLevelInsert.free();
 db.run('CREATE TABLE "星曜亮度" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "星曜類型" TEXT NOT NULL, "星性質" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER NOT NULL, "四化" TEXT NOT NULL, PRIMARY KEY ("KEY", "星曜"))');
 db.run('CREATE INDEX "idx_星曜亮度_查詢" ON "星曜亮度"("星曜", "宮位", "亮度序", "KEY")');
 
+db.run('CREATE TABLE "格局規則" ("規則ID" TEXT PRIMARY KEY, "名稱" TEXT NOT NULL, "吉凶" TEXT NOT NULL, "維度" TEXT NOT NULL, "基礎作用" REAL NOT NULL, "相關星曜" TEXT NOT NULL, "條件說明" TEXT NOT NULL)');
+const formationRuleInsert = db.prepare('INSERT INTO "格局規則" VALUES (?, ?, ?, ?, ?, ?, ?)');
+for (const item of FORMATION_RULES) formationRuleInsert.run([item.id, item.name, item.polarity, item.dimension, item.base, item.stars, item.description]);
+formationRuleInsert.free();
+db.run(`CREATE TABLE "命盤格局" ("KEY" TEXT PRIMARY KEY REFERENCES "命盤"("KEY"), ${FORMATION_RULES.map((item) => `${quoteIdent(item.name)} INTEGER NOT NULL`).join(", ")}, "成格數" INTEGER NOT NULL, "凶格數" INTEGER NOT NULL)`);
+db.run('CREATE INDEX "idx_命盤格局_成格數" ON "命盤格局"("成格數" DESC)');
+
 db.run('CREATE TABLE "評分維度" ("維度" TEXT PRIMARY KEY, "基礎分" REAL NOT NULL, "綜合權重" REAL NOT NULL)');
 const dimensionInsert = db.prepare('INSERT INTO "評分維度" VALUES (?, ?, ?)');
 for (const dimension of DIMENSIONS) dimensionInsert.run([dimension, DIMENSION_CONFIG[dimension].baseScore, DIMENSION_CONFIG[dimension].overallWeight]);
@@ -145,7 +154,8 @@ thresholdInsert.free();
 db.run('CREATE TABLE "評分規則" ("規則ID" TEXT PRIMARY KEY, "維度" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "適用宮位" TEXT NOT NULL, "基礎作用" REAL, "說明" TEXT NOT NULL)');
 const scoringRuleInsert = db.prepare('INSERT INTO "評分規則" VALUES (?, ?, ?, ?, ?, ?, ?)');
 for (const item of STAR_RULES) scoringRuleInsert.run([item.id, item.dimension, "星曜宮位", item.star, item.palaces.join("、"), item.base, item.description]);
-for (const item of CONTEXT_RULES) scoringRuleInsert.run([item.id, item.dimension, item.type, "", "", null, item.description]);
+for (const item of TRANSFORM_RULES) scoringRuleInsert.run([`H-${item.mutagen}-${item.palace}`, item.dimension, "四化", "", item.palace, item.base, item.description]);
+for (const item of FORMATION_RULES) scoringRuleInsert.run([item.id, item.dimension, "格局", item.stars, "實際落宮", item.base, item.description]);
 scoringRuleInsert.free();
 db.run('CREATE TABLE "命盤評分明細" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "規則ID" TEXT NOT NULL REFERENCES "評分規則"("規則ID"), "維度" TEXT NOT NULL, "類型" TEXT NOT NULL, "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER, "亮度倍率" REAL NOT NULL, "基礎作用" REAL NOT NULL, "實際貢獻" REAL NOT NULL, "說明" TEXT NOT NULL)');
 db.run('CREATE INDEX "idx_評分明細_KEY" ON "命盤評分明細"("KEY", "維度")');
@@ -170,6 +180,7 @@ const insert = db.prepare(`INSERT INTO 命盤 (${columns.map(([name]) => quoteId
 const brightnessInsert = db.prepare('INSERT INTO "星曜亮度" VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 const scoreInsert = db.prepare(`INSERT INTO "_命盤原始評分" VALUES (${["KEY", ...DIMENSIONS, "綜合"].map(() => "?").join(",")})`);
 const scoreDetailInsert = db.prepare('INSERT INTO "命盤評分明細" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+const formationInsert = db.prepare(`INSERT INTO "命盤格局" VALUES (${Array(FORMATION_RULES.length + 3).fill("?").join(",")})`);
 const familyInsert = db.prepare(`INSERT INTO "_命盤家庭原始評分" VALUES (${Array(38).fill("?").join(",")})`);
 const timingInsert = db.prepare(`INSERT INTO "命盤婚育時機" VALUES (${Array(18).fill("?").join(",")})`);
 const familyDetailInsert = db.prepare(`INSERT INTO "命盤家庭評分明細" VALUES (${Array(14).fill("?").join(",")})`);
@@ -228,6 +239,7 @@ for (const date of dates) {
         const effectiveMain = isEmpty ? oppositeMain : ownMain;
         const effectiveAll = isEmpty ? oppositeAll : ownAll;
         emptyCount += isEmpty;
+        values[`${spec.label}地支`] = byPalace.get(spec.raw)?.branch ?? "";
         values[`${spec.label}是否空宮`] = isEmpty;
         values[`${spec.label}對宮`] = spec.opposite;
         values[`${spec.label}對宮主星`] = oppositeMain;
@@ -249,7 +261,7 @@ for (const date of dates) {
           ]);
         }
       }
-      const rating = scoreChart(chart);
+      const rating = scoreChart(chart, gender.label);
       scoreInsert.run([values.KEY, ...DIMENSIONS.map((dimension) => rating.scores[dimension]), rating.scores.綜合]);
       for (const item of rating.details) {
         scoreDetailInsert.run([
@@ -257,7 +269,7 @@ for (const date of dates) {
           item.brightness, item.brightnessOrder, item.factor, item.base, item.contribution, item.description,
         ]);
       }
-      const family = scoreFamily(chart, rating.scores);
+      const family = scoreFamily(chart, gender.label);
       const bestMarriage = family.timing.bestMarriage ?? {};
       familyInsert.run([
         values.KEY, `${iso} ${String(hour.index * 2).padStart(2,"0")}:00`, hour.index * 2,
@@ -269,6 +281,12 @@ for (const date of dates) {
         Number(bestMarriage.minorPeriodHongluan), Number(bestMarriage.minorPeriodTianxi),
         Number(bestMarriage.yearlyHongluan), Number(bestMarriage.yearlyTianxi),
         (bestMarriage.marriageReasons ?? []).join("；"), (family.timing.bestChildren?.childrenReasons ?? []).join("；"),
+      ]);
+      const formationCounts = rating.formations.reduce((acc, item) => { acc[item.polarity === "吉" ? "吉" : "凶"] += 1; return acc; }, { 吉: 0, 凶: 0 });
+      formationInsert.run([
+        values.KEY,
+        ...FORMATION_RULES.map((item) => rating.formationFlags[item.name]),
+        formationCounts.吉, formationCounts.凶,
       ]);
       for (const period of family.timing.rows) timingInsert.run([
         values.KEY, period.age, period.year, period.decadalRange, period.decadalPalace, period.minorPalace,
@@ -295,6 +313,7 @@ insert.free();
 brightnessInsert.free();
 scoreInsert.free();
 scoreDetailInsert.free();
+formationInsert.free();
 familyInsert.free();
 timingInsert.free();
 familyDetailInsert.free();
@@ -383,6 +402,8 @@ const metadata = {
     亮度等級: [{ name:"亮度", type:"TEXT" }, { name:"亮度序", type:"INTEGER" }],
     命盤評分: ratingMetadata,
     命盤評分明細: ["KEY","規則ID","維度","類型","星曜","宮位","亮度","亮度序","亮度倍率","基礎作用","實際貢獻","說明"].map((name) => ({ name, type: ["亮度序"].includes(name) ? "INTEGER" : ["亮度倍率","基礎作用","實際貢獻"].includes(name) ? "REAL" : "TEXT" })),
+    格局規則: ["規則ID","名稱","吉凶","維度","基礎作用","相關星曜","條件說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
+    命盤格局: ["KEY", ...FORMATION_RULES.map((item) => item.name), "成格數","凶格數"].map((name) => ({ name, type: name === "KEY" ? "TEXT" : "INTEGER" })),
     評分規則: ["規則ID","維度","類型","星曜","適用宮位","基礎作用","說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
     評分維度: [{ name:"維度", type:"TEXT" }, { name:"基礎分", type:"REAL" }, { name:"綜合權重", type:"REAL" }],
     排名門檻: [{ name:"排名", type:"TEXT" }, { name:"最低百分位", type:"REAL" }],
@@ -403,11 +424,14 @@ const metadata = {
   palaceSemantics: palaceSpecs,
   scoring: {
     dimensions: [...DIMENSIONS, "綜合"],
+    standard: "倪海廈《天紀》紫微斗數：四化為主、命宮三方四正論總格、星得正位、吉處藏凶必凶",
+    sources: ["天纪-天机道.pdf", "紫微斗数案例资料.doc", "天机道听课笔记.doc"],
     starRules: STAR_RULES.length,
-    contextRules: CONTEXT_RULES.length,
+    transformRules: TRANSFORM_RULES.length,
+    formationRules: FORMATION_RULES.length,
     configuration: DIMENSION_CONFIG,
     thresholds: RANK_THRESHOLDS,
-    formula: "base + sum(baseEffect × nature/polarity-specific brightnessFactor) + contextual transformations/synergies; clamp 0..100; annual percentile",
+    formula: "base + sum(baseEffect × nature/polarity-specific brightnessFactor) + 四化宮位作用 + 具名格局（實際落宮）；clamp 0..100; annual percentile",
     family: {
       configuration: FAMILY_CONFIG,
       percentileDenominator: rowCount,
@@ -417,4 +441,4 @@ const metadata = {
   },
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
-console.log(JSON.stringify({ year, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, contextRules: CONTEXT_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));
+console.log(JSON.stringify({ year, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, transformRules: TRANSFORM_RULES.length, formationRules: FORMATION_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));

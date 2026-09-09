@@ -36,15 +36,12 @@ for (const definition of definitions) {
 const grouped = Object.values(window.BAZI_QUERY_LIBRARY.groups).flat();
 if (grouped.length !== definitions.length || new Set(grouped).size !== definitions.length || grouped.some((key) => !seen.has(key))) throw new Error("sample query groups do not match definitions");
 const count = (sql) => db.exec(sql)[0].values[0][0];
-const badFire = count(`SELECT COUNT(*) FROM "命盤" WHERE "貪狼宮位"='財帛' AND "火星宮位"='財帛' AND ("財帛主星" NOT LIKE '%貪狼%' OR "財帛全部星" NOT LIKE '%火星%' OR "財帛宮是否空宮"<>0 OR "真財帛宮來源"<>'本宮')`);
-const badBell = count(`SELECT COUNT(*) FROM "命盤" WHERE "貪狼宮位"='財帛' AND "鈴星宮位"='財帛' AND ("財帛主星" NOT LIKE '%貪狼%' OR "財帛全部星" NOT LIKE '%鈴星%' OR "財帛宮是否空宮"<>0 OR "真財帛宮來源"<>'本宮')`);
-if (badFire || badBell) throw new Error(`strict same-palace proof failed: fire=${badFire}, bell=${badBell}`);
-const borrowedFire = count(`SELECT COUNT(*) FROM "命盤" WHERE "財帛宮是否空宮"=1 AND "真財帛宮主星" LIKE '%貪狼%' AND "火星宮位"='財帛'`);
-const borrowedFireFalsePositive = count(`SELECT COUNT(*) FROM "命盤" WHERE "財帛宮是否空宮"=1 AND "真財帛宮主星" LIKE '%貪狼%' AND "火星宮位"='財帛' AND "貪狼宮位"='財帛'`);
-if (borrowedFireFalsePositive) throw new Error(`${borrowedFireFalsePositive} borrowed 貪狼 charts falsely satisfy strict 火貪`);
-const strictExamples = db.exec(`SELECT "KEY","財帛主星","財帛全部星","貪狼宮位","火星宮位","財帛宮是否空宮","真財帛宮來源" FROM "命盤" WHERE "貪狼宮位"='財帛' AND "火星宮位"='財帛' ORDER BY "KEY" LIMIT 3`)[0];
-if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "overall_top") throw new Error("unexpected default query");
-for (const key of ["wealth_fire_greed","wealth_bell_greed","appearance_bright","health_bright_support","career_bright_leader","career_entrepreneur","social_bright","family_bright"]) {
+const legacyWealthRules = count(`SELECT COUNT(*) FROM "評分規則" WHERE "規則ID" IN ('F-HUTAN-CAI','F-LINGTAN-CAI','FEW-FIRE-GREED','FEW-BELL-GREED')`);
+if (legacyWealthRules) throw new Error("legacy 火貪／鈴貪 wealth rules remain in generated database");
+if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "geju_top") throw new Error("unexpected default query");
+const formationQueries = definitions.filter((definition) => definition.sql.includes('JOIN "命盤格局"'));
+if (formationQueries.length < 8) throw new Error(`expected >=8 queries over 命盤格局, got ${formationQueries.length}`);
+for (const key of ["wealth_zhengwei","career_huogui","career_zifu_guan","career_liusha","marriage_zifu","marriage_lianxiong","health_shaxing","research_brightness_rows"]) {
   const sql = window.BAZI_QUERY_LIBRARY.queries[key];
   if (!/星曜亮度|星等/.test(sql)) throw new Error(`${key} does not use brightness`);
 }
@@ -53,5 +50,8 @@ for(const key of ["family_best_overall","family_wealthy_parents_beautiful","fami
 }
 const normalizedRows = count('SELECT COUNT(*) FROM "星曜亮度" WHERE "星曜"=\'貪狼\' AND "宮位"=\'財帛\' AND "亮度序">=(SELECT "亮度序" FROM "亮度等級" WHERE "亮度"=\'旺\')');
 if (!normalizedRows) throw new Error("normalized brightness comparison returned no rows");
-console.log(JSON.stringify({ sampleQueries:definitions.length, groups:Object.keys(window.BAZI_QUERY_LIBRARY.groups).length, defaultQuery:window.BAZI_QUERY_LIBRARY.defaultQuery, badFire, badBell, borrowedFireCandidates:borrowedFire, borrowedFireFalsePositive, normalizedBrightnessRows:normalizedRows, strictFireExamples:asObjects(strictExamples), representativeKeys:samples }, null, 2));
+const formationRows = count('SELECT COUNT(*) FROM "命盤格局" WHERE "成格數">=1');
+if (!formationRows) throw new Error("no chart forms any named formation");
+const halfEmptyFold = count('SELECT COUNT(*) FROM "命盤格局" WHERE "半空折翅"=1 OR "廉貪陷沖命"=1');
+console.log(JSON.stringify({ sampleQueries:definitions.length, groups:Object.keys(window.BAZI_QUERY_LIBRARY.groups).length, defaultQuery:window.BAZI_QUERY_LIBRARY.defaultQuery, formationQueries:formationQueries.length, chartsWithFormation:formationRows, halfEmptyFold, legacyWealthRules, normalizedBrightnessRows:normalizedRows, representativeKeys:samples }, null, 2));
 db.close();
