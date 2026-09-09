@@ -104,7 +104,7 @@ const formationPredicates={
   "機月同梁":`m."天機宮位" IN ${TW} AND m."天梁宮位" IN ${TW} AND m."太陰宮位" IN ${TW} AND m."天同宮位" IN ${TW}`,
   "紫微七殺官祿":`${inPalace("紫微","官祿")} AND ${inPalace("七殺","官祿")}`,
   "日月夾財":`m."命宮主星"='' AND ${straddle("太陽","太陰")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})`,
-  "凶處藏吉":`((m."擎羊宮位" IN ${TW}) OR (m."陀羅宮位" IN ${TW}) OR (m."火星宮位" IN ${TW}) OR (m."鈴星宮位" IN ${TW}) OR (m."地空宮位" IN ${TW}) OR (m."地劫宮位" IN ${TW})) AND ${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>`NOT (m."${star}宮位" IN ${TW}) OR m."${star}星等" IN ('平','利','得','旺','廟')`).join(" AND ")} AND (${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>brightIn(star,"命宮",BRIGHT)).join(" OR ")})`,
+  "凶處藏吉":`((m."擎羊宮位" IN ${TW}) OR (m."陀羅宮位" IN ${TW}) OR (m."火星宮位" IN ${TW}) OR (m."鈴星宮位" IN ${TW}) OR (m."地空宮位" IN ${TW}) OR (m."地劫宮位" IN ${TW})) AND ${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>`(NOT (m."${star}宮位" IN ${TW}) OR m."${star}星等" IN ('平','利','得','旺','廟'))`).join(" AND ")} AND (${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>brightIn(star,"命宮",BRIGHT)).join(" OR ")})`,
   "廉殺廟旺":lianPair(["廉貞","七殺"],true),
   "昌曲會命":`m."文昌宮位" IN ${TW} AND m."文曲宮位" IN ${TW}`,
   "魁鉞會命":`m."天魁宮位" IN ${TW} AND m."天鉞宮位" IN ${TW}`,
