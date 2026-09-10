@@ -17,7 +17,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - A direct terrestrial-branch column for every palace, used to verify branch-specific formations such as 日月並明 and 明珠出海.
 - `空宮數` for direct multi-empty-palace research. See [PALACE_SEMANTICS.md](PALACE_SEMANTICS.md).
 - A normalized `星曜亮度` table, ordinal `亮度等級` lookup, and auditable `星曜定義` whitelist with evidence levels (`直接`、`分組`、`組合`).
-- Separate `命盤評分`, `命盤評分明細`, `評分規則`, `格局規則`, and `格局規則作用` tables; raw points, annual percentiles, grades, and every contributing rule remain inspectable without changing the raw `命盤` table.
+- Separate `命盤評分`, `命盤評分明細`, `評分規則`, `格局規則`, `關係格局規則`, and `格局規則作用` tables. The pattern catalog distinguishes formal patterns, strong/conditional combinations, structural rarity, evidence completeness, computability and score eligibility; incomplete named patterns and two-chart relationship patterns cannot silently affect single-chart ranking.
 - Separate family-planning scores, yearly PRs, per-age marriage/children timing, and an auditable evidence table. See [FAMILY_SCORING.md](FAMILY_SCORING.md).
 
 The chart generator is a batch-oriented port of `ziwei-doushu/lib/ziwei/algorithm.ts`. It uses the same `iztro` `astro.bySolar` call and `lunar-javascript`; exact traditional Chinese brightness labels are retained for filtering.

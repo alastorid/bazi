@@ -149,13 +149,13 @@ function buildContext(chart) {
 export const FORMATION_RULES = [
   // ── 吉格 ──
   formation("F-ZIFU-YAN", "紫府坐垣", "吉", "格局", 14, "紫微、天府",
-    "命宮在寅，紫微天府同入廟坐命：位列三台，將相之格，爵祿榮昌",
-    (c) => c.mingBranch === "寅" && c.samePalace("紫微", "天府")
-      && c.inPalace("紫微", "命宮") && c.orderOf("紫微") >= 6 && c.orderOf("天府") >= 6),
+    "命宮在寅或申，紫微天府同入廟坐命：位列三台，將相之格，爵祿榮昌",
+    (c) => ["寅", "申"].includes(c.mingBranch) && c.samePalace("紫微", "天府")
+      && c.inPalace("紫微", "命宮") && c.orderOf("紫微") === 7 && c.orderOf("天府") === 7),
   formation("F-SHA-CHAO", "七殺朝斗", "吉", "格局", 12, "七殺",
-    "七殺獨坐入廟於申宮命宮：將星入命，威震邊疆，爵祿榮昌",
-    (c) => c.inPalace("七殺", "命宮") && c.mingBranch === "申"
-      && c.orderOf("七殺") >= 6 && c.majorNames("命宮").join("、") === "七殺"),
+    "命宮在寅或申，七殺獨坐且入廟：將星入命，威震邊疆，爵祿榮昌",
+    (c) => c.inPalace("七殺", "命宮") && ["寅", "申"].includes(c.mingBranch)
+      && c.orderOf("七殺") === 7 && c.majorNames("命宮").join("、") === "七殺"),
   formation("F-RIYUE-BING", "日月並明", "吉", "格局", 12, "太陽、太陰",
     "太陽旺辰、太陰旺戌而命在辰戌，或命在丑而太陽旺巳、太陰旺酉：主一世榮華",
     (c) => ((c.mingBranch === "辰" || c.mingBranch === "戌") && c.inBranch("太陽", "辰") && c.inBranch("太陰", "戌")
@@ -179,35 +179,22 @@ export const FORMATION_RULES = [
     "太陽太陰均廟旺夾命宮兩側，命宮有主星：一世財祿無缺，一世榮華",
     (c) => c.majorNames("命宮").length > 0 && c.straddle("太陽", "太陰")
       && c.orderOf("太陽") >= 6 && c.orderOf("太陰") >= 6),
-  formation("F-ZIFU-JIA", "紫府夾權", "吉", "格局", 10, "紫微、天府",
-    "紫微天府夾命宮兩側：主有權勢",
-    (c) => c.straddle("紫微", "天府")),
-  formation("F-KUIYUE-JIA", "魁鉞夾貴", "吉", "格局", 8, "天魁、天鉞",
-    "天魁天鉞夾命宮兩側：貴人夾命",
-    (c) => c.straddle("天魁", "天鉞")),
   formation("F-KEQUANLU", "科權祿三會命", "吉", "格局", 16, "化祿、化權、化科",
     "化祿化權化科同會命宮三方四正：一方之主，若科在官祿、祿在財帛更是天子命",
     (c) => ["祿", "權", "科"].every((m) => c.threeWay.includes(c.mutagenPalace(m)))),
-  formation("F-QUANLU", "權祿相逢", "吉", "財富", 8, "化權、化祿／祿存",
-    "化權與化祿或祿存同宮於命財官：權祿相逢，一定自己做事業當老闆",
-    (c) => {
-      const palace = c.mutagenPalace("權");
-      return Boolean(palace) && ["命宮", "財帛", "官祿"].includes(palace)
-        && (c.mutagenPalace("祿") === palace || c.at("祿存")?.palace === palace);
-    }),
   formation("F-LUMA", "祿馬交馳", "吉", "財富", 8, "化祿／祿存、天馬",
     "祿存或化祿與天馬同宮：辛苦賺大錢，巨富",
     (c) => {
       const palace = c.at("天馬")?.palace;
       return Boolean(palace) && (c.mutagenPalace("祿") === palace || c.at("祿存")?.palace === palace);
     }),
-  formation("F-FUXIANG", "府相朝垣", "吉", "格局", 6, "天府、天相",
+  formation("F-FUXIANG", "府相會命", "吉", "格局", 6, "天府、天相",
     "天府天相分踞財帛官祿與命宮三足鼎立：天生輔佐之才",
     (c) => (c.inPalace("天府", "財帛") && c.inPalace("天相", "官祿"))
       || (c.inPalace("天府", "官祿") && c.inPalace("天相", "財帛"))),
   formation("F-HUOGUI", "火貴格", "吉", "事業", 10, "火星、貪狼",
-    "火星貪狼同宮坐命：火貴格，武貴，作武官",
-    (c) => c.samePalace("火星", "貪狼") && c.inPalace("貪狼", "命宮") && c.orderOf("貪狼") >= 3),
+    "火星與貪狼相聚：火貴格，武貴、作武官；不可誤作財帛暴富格",
+    (c) => c.samePalace("火星", "貪狼")),
   formation("F-LINGGUI", "鈴貴格", "吉", "事業", 8, "鈴星、貪狼",
     "鈴星貪狼同宮坐命：武貴之格",
     (c) => c.samePalace("鈴星", "貪狼") && c.inPalace("貪狼", "命宮") && c.orderOf("貪狼") >= 3),
@@ -224,6 +211,10 @@ export const FORMATION_RULES = [
     "命在寅、太陽廟旺在午、巨門廟旺在戌：巨日會命，先天帶財",
     (c) => c.mingBranch === "寅" && c.inBranch("太陽", "午") && c.inBranch("巨門", "戌")
       && c.orderOf("太陽") >= 6 && c.orderOf("巨門") >= 6),
+  formation("F-JURI-GE", "巨日格", "吉", "財富", 10, "巨門、太陽",
+    "命宮三方四正會巨門與太陽，且二星均廟旺才是正格：大生意人、巨富；性別差異另論",
+    (c) => c.inThreeWay("巨門") && c.inThreeWay("太陽")
+      && c.orderOf("巨門") >= 6 && c.orderOf("太陽") >= 6),
   formation("F-MINGLU", "命帶祿", "吉", "財富", 6, "化祿／祿存",
     "化祿或祿存坐命：命宮帶祿，一輩子用不完的錢",
     (c) => c.mutagenPalace("祿") === "命宮" || c.inPalace("祿存", "命宮")),
@@ -238,10 +229,6 @@ export const FORMATION_RULES = [
   formation("F-ZISHA-GUAN", "紫微七殺官祿", "吉", "事業", 8, "紫微、七殺",
     "紫微七殺同宮於官祿：官權壓重，代表權",
     (c) => c.samePalace("紫微", "七殺") && c.inPalace("紫微", "官祿")),
-  formation("F-RIYUE-CAI", "日月夾財", "吉", "財富", 10, "太陽、太陰",
-    "太陽太陰均廟旺夾命，即使命宮無主星也一世財運",
-    (c) => c.majorNames("命宮").length === 0 && c.straddle("太陽", "太陰")
-      && c.orderOf("太陽") >= 6 && c.orderOf("太陰") >= 6),
   formation("F-XIONG-CHU-JI", "凶處藏吉", "吉", "格局", 4, "吉星入廟",
     "三方四正煞星未落陷且吉星入廟坐命：平安",
     (c) => c.threeWaySha.length >= 1 && c.threeWaySha.every((s) => c.orderOf(s) >= 3)
@@ -249,12 +236,18 @@ export const FORMATION_RULES = [
   formation("F-LIANSHA-WANG", "廉殺廟旺", "吉", "財富", 8, "廉貞、七殺",
     "廉貞七殺同宮均廟旺：代表積富；殺星廟旺凶處藏吉",
     (c) => c.samePalace("廉貞", "七殺") && c.orderOf("廉貞") >= 6 && c.orderOf("七殺") >= 6),
+  formation("F-LIANSHA-TONG", "廉貞七殺同宮", "條件", "格局", 0, "廉貞、七殺",
+    "廉貞七殺同宮，必須再按亮度分層：廟旺積富，落陷大凶",
+    (c) => c.samePalace("廉貞", "七殺")),
   formation("F-CHANGQU", "昌曲會命", "吉", "科甲", 6, "文昌、文曲",
     "文昌文曲同會命宮三方四正：讀書奇才，科甲旺",
     (c) => c.inThreeWay("文昌") && c.inThreeWay("文曲")),
   formation("F-KUIYUE-HUI", "魁鉞會命", "吉", "科甲", 5, "天魁、天鉞",
     "天魁天鉞同會命宮三方四正：科甲貴人，讀書考試很棒",
     (c) => c.inThreeWay("天魁") && c.inThreeWay("天鉞")),
+  formation("F-CHANGQU-KUIYUE", "昌曲魁鉞來會", "吉", "科甲", 10, "文昌、文曲、天魁、天鉞",
+    "文昌、文曲、天魁、天鉞全數會命宮三方四正：科甲、讀書奇才",
+    (c) => ["文昌", "文曲", "天魁", "天鉞"].every((star) => c.inThreeWay(star))),
   formation("F-FU-BIYU", "紫輔同夫", "吉", "婚姻", 6, "紫微、左輔、右弼",
     "紫微左輔右弼同在夫妻宮：對象很優秀",
     (c) => c.inPalace("紫微", "夫妻") && c.inPalace("左輔", "夫妻") && c.inPalace("右弼", "夫妻")),
@@ -273,6 +266,32 @@ export const FORMATION_RULES = [
   formation("F-SHEN-GUAN", "身在官祿", "吉", "事業", 4, "身宮",
     "身宮在官祿：後天從政做官",
     (c) => c.bodyPalace === "官祿"),
+  formation("F-XIONGSU", "雄宿朝元格", "條件", "格局", 10, "廉貞",
+    "命宮在寅或申，廉貞孤星獨守：前段利軍人、將相、商人老闆，後段須防桃花破格",
+    (c) => ["寅", "申"].includes(c.mingBranch) && c.inPalace("廉貞", "命宮")
+      && c.majorNames("命宮").join("、") === "廉貞"),
+  formation("F-MING-WUZHENG", "命無正曜格", "未定", "格局", 0, "命宮無主星",
+    "命宮無正曜／主星：教材使用此格名，但未給完整統一吉凶定義",
+    (c) => c.majorNames("命宮").length === 0),
+  formation("F-CAIGUAN-SHUANGMEI", "財官雙美", "吉", "格局", 10, "化科、化祿",
+    "官祿宮有化科、財帛宮有化祿：有官帶又有財帛",
+    (c) => c.mutagenPalace("科") === "官祿" && c.mutagenPalace("祿") === "財帛"),
+  formation("F-WUSHA-TONG", "武曲七殺同宮", "條件", "格局", 0, "武曲、七殺",
+    "武曲七殺同宮：結果須按亮度與性別另論，不設定一體適用的分數",
+    (c) => c.samePalace("武曲", "七殺")),
+  formation("F-WUPO-TONG", "武曲破軍同宮", "條件", "格局", 0, "武曲、破軍",
+    "武曲破軍同宮：將星、權力欲重；只按教材的性別差異計分，不設男女通用分數",
+    (c) => c.samePalace("武曲", "破軍")),
+  formation("F-SHA-DAXIAN", "殺星獨守大運", "凶", "格局", 10, "擎羊、陀羅、火星、鈴星、天空、地劫",
+    "六煞之一獨守某大限宮，本宮無主星、吉曜或祿權科化解：教材斷大凶",
+    (c) => c.palaces.some((palace) => {
+      const names = palace.stars.map((star) => star.name);
+      const shaCount = c.shaStars.filter((star) => names.includes(star)).length;
+      const hasMajor = palace.stars.some((star) => star.type === "major");
+      const hasAux = c.auxStars.some((star) => names.includes(star));
+      const hasGoodTransform = palace.stars.some((star) => ["祿", "權", "科"].includes(star.siHua));
+      return shaCount === 1 && !hasMajor && !hasAux && !hasGoodTransform;
+    })),
 
   // ── 新評分稿所列的複合條件；組合加分遠高於單星加分 ──
   formation("F-QUANLU-CAI", "權祿同財帛", "吉", "財富", 300, "化權、祿存",
@@ -282,8 +301,8 @@ export const FORMATION_RULES = [
     "武曲、貪狼、化權、化祿同入命宮：巨富",
     (c) => c.inPalace("武曲", "命宮") && c.inPalace("貪狼", "命宮")
       && c.mutagenPalace("權") === "命宮" && c.mutagenPalace("祿") === "命宮"),
-  formation("F-MING-QUANLU", "權祿會命", "吉", "財富", 500, "化權、化祿",
-    "命宮三方四正同會化權與化祿：財富與創業能力",
+  formation("F-MING-QUANLU", "權祿相逢命", "吉", "財富", 500, "化權、化祿",
+    "命宮三方四正權祿相逢：自己做事業、當老闆",
     (c) => c.threeWay.includes(c.mutagenPalace("權")) && c.threeWay.includes(c.mutagenPalace("祿"))),
   formation("F-GUAN-QUANCAI", "官祿權財", "吉", "官運", 250, "化權、大財星",
     "官祿宮同見權星與財星：財經行業主管",
@@ -309,12 +328,6 @@ export const FORMATION_RULES = [
   formation("F-YIN-CHANGQU-MING", "太陰昌曲同命", "吉", "魅力", 999, "太陰、文昌、文曲",
     "太陰、文昌、文曲同入命宮：才藝過人、桃花命",
     (c) => c.inPalace("太陰", "命宮") && c.inPalace("文昌", "命宮") && c.inPalace("文曲", "命宮")),
-  formation("F-HONGXI-MING", "紅喜同命", "吉", "桃花", 300, "紅鸞、天喜",
-    "紅鸞天喜同入命宮：桃花與婚緣",
-    (c) => c.inPalace("紅鸞", "命宮") && c.inPalace("天喜", "命宮")),
-  formation("F-HONGXI-FU", "紅喜同夫妻", "吉", "婚姻", 300, "紅鸞、天喜",
-    "紅鸞天喜同會夫妻宮：婚姻加分",
-    (c) => c.inPalace("紅鸞", "夫妻") && c.inPalace("天喜", "夫妻")),
   formation("F-QUANLU-FU", "權祿同夫妻", "吉", "婚姻", 300, "化權、化祿",
     "化權化祿同入夫妻宮：配偶能力強",
     (c) => c.mutagenPalace("權") === "夫妻" && c.mutagenPalace("祿") === "夫妻"),
@@ -341,9 +354,6 @@ export const FORMATION_RULES = [
   formation("F-FANBEI-JIA", "日月反背夾命", "凶", "格局", -12, "太陽、太陰",
     "太陽太陰落陷夾命宮兩側：一世辛勞",
     (c) => c.straddle("太陽", "太陰") && c.orderOf("太陽") <= 2 && c.orderOf("太陰") <= 2),
-  formation("F-YANGTUO-JIA", "羊陀夾命", "凶", "格局", -12, "擎羊、陀羅",
-    "擎羊陀羅夾命宮兩側：犯小人，容易被人影響",
-    (c) => c.straddle("擎羊", "陀羅")),
   formation("F-LIANSHA-XIAN", "廉殺落陷", "凶", "格局", -14, "廉貞、七殺",
     "廉貞七殺同宮落陷：半路埋屍，橫死之格；殺星落陷在劫難逃",
     (c) => c.samePalace("廉貞", "七殺") && c.orderOf("廉貞") <= 2 && c.orderOf("七殺") <= 2),
@@ -369,7 +379,7 @@ export const FORMATION_RULES = [
     "紫微坐命而無左輔右弼同宮會照：為僧道，或人厚道性情孤獨",
     (c) => c.inPalace("紫微", "命宮")
       && !["命宮", "財帛", "官祿", "遷移"].some((p) => c.inPalace("左輔", p) || c.inPalace("右弼", p))),
-  formation("F-SHAPOLANG", "殺破狼會命", "凶", "格局", -4, "七殺、破軍、貪狼",
+  formation("F-SHAPOLANG", "殺破狼三方會命", "凶", "格局", -4, "七殺、破軍、貪狼",
     "七殺、破軍、貪狼三顆全在命宮三方四正會齊：剛愎自用，易被人利用；女命加重為 −6",
     (c, gender) => ["七殺", "破軍", "貪狼"].every((name) => c.inThreeWay(name))),
   formation("F-SHA-SHEN", "七殺臨身", "凶", "事業", -6, "七殺",
@@ -402,6 +412,36 @@ export const FORMATION_RULES = [
     (c) => c.inPalace("太陰", "父母") && c.orderOf("太陰") <= 2),
 ];
 
+const PATTERN_METADATA = Object.freeze({
+  "F-ZIFU-YAN": ["正式格局", "嚴格", 5], "F-SHA-CHAO": ["正式格局", "嚴格", 5],
+  "F-JURI-GE": ["正式格局", "嚴格", 3], "F-HUOGUI": ["正式格局", "嚴格", 4],
+  "F-XIONGSU": ["正式格局", "嚴格", 5], "F-BANKONG": ["正式格局", "嚴格", 4],
+  "F-FANBEI": ["正式格局", "嚴格", 4], "F-FANBEI-JIA": ["正式格局", "嚴格", 4],
+  "F-MING-WUZHENG": ["正式格局", "條件明確、結果未定", 2, 0], "F-LUMA": ["正式格局", "嚴格", 3],
+  "F-FUXIANG": ["正式格局", "嚴格", 3], "F-SHAPOLANG": ["正式格局", "嚴格", 4],
+  "F-KEQUANLU": ["強組合", "嚴格", 4], "F-MING-QUANLU": ["強組合", "嚴格", 3],
+  "F-CAIGUAN-SHUANGMEI": ["強組合", "嚴格", 4], "F-CHANGQU-KUIYUE": ["強組合", "嚴格", 4],
+  "F-LIANSHA-TONG": ["條件組合", "亮度依賴", 3], "F-LIANSHA-WANG": ["條件組合", "亮度依賴", 3],
+  "F-LIANSHA-XIAN": ["條件組合", "亮度依賴", 3], "F-WUSHA-TONG": ["條件組合", "性別及亮度依賴", 3],
+  "F-WUPO-TONG": ["條件組合", "性別依賴", 3], "F-LIANPO": ["條件組合", "宮位限定", 3],
+  "F-LIANTAN-MARR": ["條件組合", "宮位限定", 3], "F-SHA-DAXIAN": ["強組合", "大限宮位限定", 2],
+});
+
+export const KNOWN_INCOMPLETE_PATTERNS = Object.freeze([
+  { id: "K-RIYUE-JIACAI", name: "日月夾財", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "太陽、太陰", description: "本宮左右兩鄰宮形成夾宮結構：教材只列格名，完整狹義條件與結果不足", knownPattern: 1, fullyExplained: 0, computable: 0 },
+  { id: "K-ZIFU-JIAQUAN", name: "紫府夾權", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "紫微、天府", description: "教材只列格名：完整狹義條件與結果不足，不自行補規則", knownPattern: 1, fullyExplained: 0, computable: 0 },
+  { id: "K-KUIYUE-JIAGUI", name: "魁鉞夾貴", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "天魁、天鉞", description: "教材只列格名：完整狹義條件與結果不足，不自行補規則", knownPattern: 1, fullyExplained: 0, computable: 0 },
+  { id: "K-YANGTUO-JIASHA", name: "羊陀夾殺", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "擎羊、陀羅", description: "教材只列格名：完整狹義條件與結果不足，不自行補規則", knownPattern: 1, fullyExplained: 0, computable: 0 },
+  { id: "K-HONGXI-HUI", name: "紅鸞天喜交會", type: "強組合", strictness: "所在宮條件待限定", rarity: 2, polarity: "條件", stars: "紅鸞、天喜", description: "紅鸞天喜交會主婚姻事件強；所在宮凶仍可破壞結果，未限定所在宮前不計分", knownPattern: 1, fullyExplained: 0, computable: 0 },
+]);
+
+export const RELATIONSHIP_PATTERN_DEFINITIONS = Object.freeze([
+  { id: "R-MUZI", name: "母子格", type: "兩盤關係格", scope: "兩人命盤", fullyExplained: 1, description: "男方父母宮星曜落入伴侶命宮，屬兩盤關係對應，不進單張命盤排行榜" },
+  { id: "R-FUNV", name: "父女格", type: "兩盤關係格", scope: "兩人命盤", fullyExplained: 0, description: "教材使用此關係格名稱；待補足兩盤對應條件，不進單張命盤排行榜" },
+  { id: "R-XIONGDI", name: "兄弟格", type: "兩盤關係格", scope: "兩人命盤", fullyExplained: 0, description: "教材使用此關係格名稱；待補足兩盤對應條件，不進單張命盤排行榜" },
+  { id: "R-PENGYOU", name: "朋友格", type: "兩盤關係格", scope: "兩人命盤", fullyExplained: 0, description: "教材使用此關係格名稱；待補足兩盤對應條件，不進單張命盤排行榜" },
+]);
+
 // 一個格局可以同時作用於多個維度。這是評分唯一來源；格局旗標本身不暗加分。
 export const FORMATION_EFFECTS = {
   "F-ZIFU-YAN": { 幸運: 999, 官運: 999, 財富: 500 },
@@ -412,14 +452,18 @@ export const FORMATION_EFFECTS = {
   "F-RI-LI": { 官運: 500 },
   "F-RIYUE-JIA": { 財富: 500, 幸運: 500 },
   "F-FANBEI-JIA": { 幸運: -500 },
-  "F-JURI": { 財富: 999, 經商: 999 },
-  "F-JURI-HUI": { 財富: 999 },
+  "F-JURI-GE": { 財富: { 男: 999, 女: 500 }, 經商: { 男: 999, 女: 500 }, 婚姻: { 女: -500 } },
+  "F-HUOGUI": { 官運: 500, 事業: 500 },
+  "F-XIONGSU": { 事業: 500, 經商: 500, 桃花: -300, 婚姻: -300 },
+  "F-KEQUANLU": { 幸運: 999, 官運: 999, 事業: 500 },
   "F-LUMA": { 財富: 999, 幸運: 500 },
   "F-MINGLU": { 財富: 300 },
   "F-ZISHA-GUAN": { 官運: 500, 事業: 500 },
   "F-QUANLU-CAI": { 財富: 300 },
   "F-WUTAN-QUANLU-MING": { 財富: 999 },
   "F-MING-QUANLU": { 財富: 500, 經商: 500 },
+  "F-CAIGUAN-SHUANGMEI": { 財富: 500, 官運: 500, 事業: 300 },
+  "F-CHANGQU-KUIYUE": { 科甲: 999 },
   "F-GUAN-QUANCAI": { 官運: 250, 財富: 150 },
   "F-GUAN-KONG": { 官運: -300 },
   "F-LIUSHA-GUAN": { 事業: -200 },
@@ -429,16 +473,37 @@ export const FORMATION_EFFECTS = {
   "F-KUIYUE-KE-MING": { 科甲: 500 },
   "F-CHANGQU-MING": { 科甲: 250, 才藝: 250 },
   "F-YIN-CHANGQU-MING": { 才藝: 500, 魅力: 999 },
-  "F-HONGXI-MING": { 桃花: 300 },
   "F-FANSHUI": { 魅力: 999, 桃花: 500 },
   "F-FU-TIANMA": { 婚姻: 500 },
-  "F-HONGXI-FU": { 婚姻: 300 },
   "F-QUANLU-FU": { 婚姻: 300 },
   "F-LIANFU-FU": { 婚姻: 250 },
   "F-LIANPO": { 婚姻: -999 },
   "F-LIANTAN-MARR": { 婚姻: -999 },
   "F-LIANPO-CAI": { 經商: -500 },
+  "F-BANKONG": { 幸運: -999, 事業: -500 },
+  "F-FANBEI": { 幸運: -500, 婚姻: -300 },
+  "F-LIANSHA-WANG": { 財富: 500 },
+  "F-LIANSHA-XIAN": { 幸運: -999 },
+  "F-WUSHA-XIAN": { 幸運: -999 },
+  "F-SHAPOLANG": { 幸運: -300, 社交: -200 },
+  "F-SHA-DAXIAN": { 幸運: -999 },
+  "F-WUPO-TONG": { 事業: { 男: 300, 女: -300 }, 官運: { 男: 300, 女: -300 } },
 };
+
+const patternText = (description) => {
+  const separator = description.indexOf("：");
+  return separator < 0
+    ? { condition: description, teachingResult: "教材未另行提供統一結果" }
+    : { condition: description.slice(0, separator), teachingResult: description.slice(separator + 1) };
+};
+
+export const PATTERN_DEFINITIONS = Object.freeze([
+  ...FORMATION_RULES.map((item) => {
+    const [type = "教材規則", strictness = "條件明確", rarity = null, fullyExplained = 1] = PATTERN_METADATA[item.id] ?? [];
+    return { ...item, ...patternText(item.description), type, strictness, rarity, rarityBasis: "條件結構嚴格度，非出生人口統計機率", knownPattern: 1, fullyExplained, computable: 1, scorable: Object.keys(FORMATION_EFFECTS[item.id] ?? {}).length ? 1 : 0 };
+  }),
+  ...KNOWN_INCOMPLETE_PATTERNS.map((item) => ({ ...item, ...patternText(item.description), rarityBasis: "教材條件不足，不評估結構稀有度", scorable: 0 })),
+]);
 
 // 四化一律採新評分稿明列的作用；同一四化可以分別寫入多個維度。
 export const TRANSFORM_RULES = [

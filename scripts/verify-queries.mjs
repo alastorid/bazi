@@ -19,19 +19,24 @@ const asObjects = (result) => result ? result.values.map((values) => Object.from
 const definitions = window.BAZI_QUERY_LIBRARY.definitions;
 if (definitions.length < 20 || definitions.length > 40) throw new Error(`query library must contain 20–40 entries, got ${definitions.length}`);
 const expectedHeader = ["KEY","命盤連結","公曆日期","時辰","性別"];
+const catalogHeaders = {
+  pattern_catalog: ["名稱","類型","嚴格度","結構稀有度","稀有度說明","吉凶","完整解釋","可計算","可計分","相關星曜","成格條件","教材結果"],
+  relationship_pattern_catalog: ["名稱","類型","適用範圍","完整解釋","條件說明"],
+};
 const seen = new Set();
 const samples = {};
 for (const definition of definitions) {
   if (seen.has(definition.key)) throw new Error(`duplicate sample query key: ${definition.key}`);
   seen.add(definition.key);
   for (const field of ["key","group","label","description","sql"]) if (!definition[field]) throw new Error(`${definition.key} missing metadata field: ${field}`);
-  if (!definition.sql.includes('JOIN "命盤評分"')) throw new Error(`${definition.key} does not expose the ranking engine`);
+  const expectedColumns = catalogHeaders[definition.key] ?? expectedHeader;
+  if (!catalogHeaders[definition.key] && !definition.sql.includes('JOIN "命盤評分"')) throw new Error(`${definition.key} does not expose the ranking engine`);
   const result = db.exec(translateTop(definition.sql))[0];
   if (!result) throw new Error(`${definition.key} returned no result set`);
-  if (expectedHeader.some((name,index) => result.columns[index] !== name)) throw new Error(`${definition.key} has inconsistent result header`);
+  if (expectedColumns.some((name,index) => result.columns[index] !== name)) throw new Error(`${definition.key} has inconsistent result header`);
   const objects = asObjects(result);
   if (!objects.length) throw new Error(`${definition.key} has no 2027 matches; rewrite or remove it`);
-  samples[definition.key] = [objects[0], objects[Math.floor(objects.length / 2)], objects.at(-1)].filter(Boolean).map((row) => row.KEY);
+  if (!catalogHeaders[definition.key]) samples[definition.key] = [objects[0], objects[Math.floor(objects.length / 2)], objects.at(-1)].filter(Boolean).map((row) => row.KEY);
 }
 const grouped = Object.values(window.BAZI_QUERY_LIBRARY.groups).flat();
 if (grouped.length !== definitions.length || new Set(grouped).size !== definitions.length || grouped.some((key) => !seen.has(key))) throw new Error("sample query groups do not match definitions");
