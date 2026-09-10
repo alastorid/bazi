@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="bazi" />
     <title>bazi</title>
-    <link rel="stylesheet" href="terminal.css?v=10" />
-    <link rel="stylesheet" href="visualization.css?v=2" />
+    <link rel="stylesheet" href="terminal.css?v=11" />
+    <link rel="stylesheet" href="visualization.css?v=3" />
   </head>
   <body>
     <header class="app-bar">
       <strong>bazi</strong>
+      <nav class="workspace-tabs" aria-label="工作區">
+        <button class="workspace-tab active" data-workspace-tab="query" type="button">SQL 查詢</button>
+        <button class="workspace-tab" data-workspace-tab="visualization" type="button">可視化</button>
+      </nav>
       <span id="connectionState">資料庫</span>
       <button id="runSql" class="run-button" type="button" disabled>▶ 執行（F5）</button>
       <button id="themeToggle" class="icon-button" type="button" title="切換主題">☾</button>
@@ -24,14 +28,10 @@
       </aside>
 
       <main class="workbench">
-      <div class="workspace-tabs">
-        <button class="workspace-tab active" data-workspace-tab="query" type="button">查詢</button>
-        <button class="workspace-tab" data-workspace-tab="visualization" type="button">視覺化</button>
-      </div>
       <section id="queryWorkspace" class="workspace-view query-workspace active">
       <section class="query-pane">
         <div class="pane-tabs">
-          <button class="query-tab active" type="button">查詢一</button>
+          <span class="pane-title">SQL</span>
           <span id="queryState">就緒</span>
         </div>
         <div class="editor-wrap">
@@ -73,8 +73,8 @@
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="queryLibrary.js?v=10" defer></script>
-    <script src="visualization.js?v=2" defer></script>
-    <script src="terminal.js?v=16" defer></script>
+    <script src="queryLibrary.js?v=11" defer></script>
+    <script src="visualization.js?v=4" defer></script>
+    <script src="terminal.js?v=17" defer></script>
   </body>
 </html>

@@ -16,8 +16,14 @@ import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/conf
 import { scoreFamily } from "../src/scoring/family-scoring.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const year = Number(process.argv[2] || new Date().getFullYear() + 1);
-if (!Number.isInteger(year) || year < 1900 || year > 2200) throw new Error(`Invalid year: ${year}`);
+const rangeInput = String(process.argv[2] || `${new Date().getFullYear() + 1}`);
+const rangeMatch = rangeInput.match(/^(\d{4})(?:-(\d{4}))?$/);
+if (!rangeMatch) throw new Error(`Invalid year range: ${rangeInput}`);
+const startYear = Number(rangeMatch[1]);
+const endYear = Number(rangeMatch[2] || rangeMatch[1]);
+if (startYear < 1900 || endYear > 2200 || startYear > endYear) throw new Error(`Invalid year range: ${rangeInput}`);
+const years = Array.from({ length: endYear - startYear + 1 }, (_, index) => startYear + index);
+const rangeLabel = startYear === endYear ? `${startYear}` : `${startYear}-${endYear}`;
 
 const dataDir = path.join(root, "data");
 const vendorDir = path.join(root, "vendor", "sqljs");
@@ -39,7 +45,8 @@ function datesOfYear(targetYear) {
 
 const pad2 = (value) => String(value).padStart(2, "0");
 const quoteIdent = (value) => `"${String(value).replaceAll('"', '""')}"`;
-const dates = datesOfYear(year);
+const dates = years.flatMap(datesOfYear);
+const patternById = new Map(PATTERN_DEFINITIONS.map((item) => [item.id, item]));
 const brightnessRank = new Map(BRIGHTNESS_LEVELS);
 const evidenceLevelLabel = Object.freeze({ direct: "直接", group: "分組", combination: "組合" });
 const familyScoreFields = [
@@ -156,6 +163,8 @@ for (const item of FORMATION_RULES) for (const [dimension, configured] of Object
   else for (const [gender, value] of Object.entries(configured)) formationEffectInsert.run([item.id, dimension, gender, value]);
 }
 formationEffectInsert.free();
+db.run('CREATE TABLE "命盤格局明細" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "規則ID" TEXT NOT NULL REFERENCES "格局規則"("規則ID"), "名稱" TEXT NOT NULL, "類型" TEXT NOT NULL, "吉凶" TEXT NOT NULL, "結構稀有度" INTEGER, "成格條件" TEXT NOT NULL, "教材結果" TEXT NOT NULL, PRIMARY KEY ("KEY", "規則ID"))');
+db.run('CREATE INDEX "idx_格局明細_查詢" ON "命盤格局明細"("吉凶", "結構稀有度" DESC, "KEY")');
 db.run(`CREATE TABLE "命盤格局" ("KEY" TEXT PRIMARY KEY REFERENCES "命盤"("KEY"), ${FORMATION_RULES.map((item) => `${quoteIdent(item.name)} INTEGER NOT NULL`).join(", ")}, "成格數" INTEGER NOT NULL, "凶格數" INTEGER NOT NULL)`);
 db.run('CREATE INDEX "idx_命盤格局_成格數" ON "命盤格局"("成格數" DESC)');
 
@@ -200,18 +209,19 @@ const brightnessInsert = db.prepare('INSERT INTO "星曜亮度" VALUES (?, ?, ?,
 const scoreInsert = db.prepare(`INSERT INTO "_命盤原始評分" VALUES (${["KEY", ...DIMENSIONS, "綜合"].map(() => "?").join(",")})`);
 const scoreDetailInsert = db.prepare('INSERT INTO "命盤評分明細" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 const formationInsert = db.prepare(`INSERT INTO "命盤格局" VALUES (${Array(FORMATION_RULES.length + 3).fill("?").join(",")})`);
+const formationDetailInsert = db.prepare('INSERT INTO "命盤格局明細" VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 const familyInsert = db.prepare(`INSERT INTO "_命盤家庭原始評分" VALUES (${Array(38).fill("?").join(",")})`);
 const timingInsert = db.prepare(`INSERT INTO "命盤婚育時機" VALUES (${Array(18).fill("?").join(",")})`);
 const familyDetailInsert = db.prepare(`INSERT INTO "命盤家庭評分明細" VALUES (${Array(14).fill("?").join(",")})`);
 db.run("BEGIN");
 let rowCount = 0;
-console.log(`Generating ${dates.length * HOURS.length * GENDERS.length} charts for ${year}…`);
+console.log(`Generating ${dates.length * HOURS.length * GENDERS.length} charts for ${rangeLabel}…`);
 for (const date of dates) {
   for (const hour of HOURS) {
     for (const gender of GENDERS) {
       const chart = generateChart({ ...date, hour: hour.index, gender: gender.code, timingAgeRange: FAMILY_CONFIG.marriageAgeRange });
-      const iso = `${year}-${pad2(date.month)}-${pad2(date.day)}`;
-      const compact = `${year}${pad2(date.month)}${pad2(date.day)}`;
+      const iso = `${date.year}-${pad2(date.month)}-${pad2(date.day)}`;
+      const compact = `${date.year}${pad2(date.month)}${pad2(date.day)}`;
       const byStar = new Map();
       const byPalace = new Map();
       const siHua = new Map();
@@ -224,9 +234,9 @@ for (const date of dates) {
       }
       const values = {
         KEY: `${compact}-${hour.label}-${gender.label}`,
-        公曆日期: iso, 年: year, 月: date.month, 日: date.day, 時辰: hour.label,
+        公曆日期: iso, 年: date.year, 月: date.month, 日: date.day, 時辰: hour.label,
         時辰序號: hour.index, 性別: gender.label,
-        命盤連結: `https://metisziwei.com/chart?y=${year}&m=${date.month}&d=${date.day}&h=${hour.index * 2}&mi=0&g=${gender.code === "female" ? "f" : "m"}`,
+        命盤連結: `https://metisziwei.com/chart?y=${date.year}&m=${date.month}&d=${date.day}&h=${hour.index * 2}&mi=0&g=${gender.code === "female" ? "f" : "m"}`,
         農曆日期: `${chart.lunarInfo.lunarYear}-${chart.lunarInfo.isLeapMonth ? "閏" : ""}${pad2(chart.lunarInfo.lunarMonth)}-${pad2(chart.lunarInfo.lunarDay)}`,
         年干: chart.lunarInfo.yearStem, 年支: chart.lunarInfo.yearBranch,
         命宮: chart.soulBranch, 身宮: chart.bodyBranch, 身宮宮位: chart.bodyPalaceName,
@@ -302,12 +312,17 @@ for (const date of dates) {
         Number(bestMarriage.yearlyHongluan), Number(bestMarriage.yearlyTianxi),
         (bestMarriage.marriageReasons ?? []).join("；"), (family.timing.bestChildren?.childrenReasons ?? []).join("；"),
       ]);
-      const formationCounts = rating.formations.reduce((acc, item) => { acc[item.polarity === "吉" ? "吉" : "凶"] += 1; return acc; }, { 吉: 0, 凶: 0 });
+      const formationCounts = rating.formations.reduce((acc, item) => { if (item.polarity === "吉" || item.polarity === "凶") acc[item.polarity] += 1; return acc; }, { 吉: 0, 凶: 0 });
       formationInsert.run([
         values.KEY,
         ...FORMATION_RULES.map((item) => rating.formationFlags[item.name]),
         formationCounts.吉, formationCounts.凶,
       ]);
+      for (const formed of rating.formations) {
+        const definition = patternById.get(formed.id);
+        if (!definition) continue;
+        formationDetailInsert.run([values.KEY, definition.id, definition.name, definition.type, definition.polarity, definition.rarity, definition.condition, definition.teachingResult]);
+      }
       for (const period of family.timing.rows) timingInsert.run([
         values.KEY, period.age, period.year, period.decadalRange, period.decadalPalace, period.minorPalace,
         Number(period.majorPeriodHongluan), Number(period.majorPeriodTianxi),
@@ -334,6 +349,7 @@ brightnessInsert.free();
 scoreInsert.free();
 scoreDetailInsert.free();
 formationInsert.free();
+formationDetailInsert.free();
 familyInsert.free();
 timingInsert.free();
 familyDetailInsert.free();
@@ -373,8 +389,8 @@ const bytes = Buffer.from(db.export());
 db.close();
 const gzip = zlib.gzipSync(bytes, { level: 9 });
 const hash = crypto.createHash("sha256").update(gzip).digest("hex");
-fs.writeFileSync(path.join(dataDir, `ziwei-${year}.sqlite`), bytes);
-fs.writeFileSync(path.join(dataDir, `ziwei-${year}.sqlite.gz`), gzip);
+fs.writeFileSync(path.join(dataDir, `ziwei-${rangeLabel}.sqlite`), bytes);
+fs.writeFileSync(path.join(dataDir, `ziwei-${rangeLabel}.sqlite.gz`), gzip);
 const ratingMetadata = [{ name:"KEY", type:"TEXT" }, ...[...DIMENSIONS, "綜合"].flatMap((dimension) => [
   { name:`${dimension}分`, type:"REAL" }, { name:`${dimension}排名`, type:"TEXT" }, { name:`${dimension}百分位`, type:"REAL" },
 ])];
@@ -391,7 +407,10 @@ const metadata = {
   version: 1,
   generatedAt: new Date().toISOString(),
   algorithm: "ziwei-doushu/lib/ziwei/algorithm.ts (iztro bySolar, zh-TW)",
-  year,
+  year: startYear === endYear ? startYear : rangeLabel,
+  years,
+  startYear,
+  endYear,
   rowCount,
   keyFormat: "YYYYMMDD-時辰-性別",
   table: "命盤",
@@ -405,6 +424,7 @@ const metadata = {
     格局規則: ["規則ID","名稱","類型","嚴格度","結構稀有度","稀有度說明","吉凶","已知格局","完整解釋","可計算","可計分","相關星曜","成格條件","教材結果","條件說明"].map((name) => ({ name, type: ["結構稀有度","已知格局","完整解釋","可計算","可計分"].includes(name) ? "INTEGER" : "TEXT" })),
     關係格局規則: ["規則ID","名稱","類型","適用範圍","完整解釋","條件說明"].map((name) => ({ name, type: name === "完整解釋" ? "INTEGER" : "TEXT" })),
     格局規則作用: ["規則ID","維度","適用性別","基礎作用"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
+    命盤格局明細: ["KEY","規則ID","名稱","類型","吉凶","結構稀有度","成格條件","教材結果"].map((name) => ({ name, type: name === "結構稀有度" ? "INTEGER" : "TEXT" })),
     命盤格局: ["KEY", ...FORMATION_RULES.map((item) => item.name), "成格數","凶格數"].map((name) => ({ name, type: name === "KEY" ? "TEXT" : "INTEGER" })),
     評分規則: ["規則ID","維度","類型","星曜","適用宮位","基礎作用","說明"].map((name) => ({ name, type: name === "基礎作用" ? "REAL" : "TEXT" })),
     評分維度: [{ name:"維度", type:"TEXT" }, { name:"基礎分", type:"REAL" }, { name:"綜合權重", type:"REAL" }],
@@ -413,7 +433,7 @@ const metadata = {
     命盤家庭評分明細: ["KEY","規則ID","組件","類型","星曜","宮位","亮度","亮度序","亮度倍率","基礎作用","實際貢獻","年齡","年份","說明"].map((name)=>({name,type:["亮度倍率","基礎作用","實際貢獻"].includes(name)?"REAL":["亮度序","年齡","年份"].includes(name)?"INTEGER":"TEXT"})),
     命盤婚育時機: ["KEY","年齡","年份","大限範圍","大限本命宮位","小限本命宮位","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻觸發數","婚姻觸發分","子女觸發分","家庭時機分","婚姻原因","子女原因"].map((name)=>({name,type:["婚姻觸發分","子女觸發分","家庭時機分"].includes(name)?"REAL":["年齡","年份","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻觸發數"].includes(name)?"INTEGER":"TEXT"})),
   },
-  sqlite: `data/ziwei-${year}.sqlite.gz`,
+  sqlite: `data/ziwei-${rangeLabel}.sqlite.gz`,
   hash,
   uncompressedBytes: bytes.byteLength,
   compressedBytes: gzip.byteLength,
@@ -440,10 +460,10 @@ const metadata = {
     family: {
       configuration: FAMILY_CONFIG,
       percentileDenominator: rowCount,
-      globalPercentile: "unavailable: yearly artifacts are independent",
+      globalPercentile: "unavailable: generated ranges are independent",
       balanceMethod: "weighted harmonic mean minus the configured parents-negative penalty",
     },
   },
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
-console.log(JSON.stringify({ year, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, transformRules: TRANSFORM_RULES.length, formationRules: FORMATION_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));
+console.log(JSON.stringify({ years, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, transformRules: TRANSFORM_RULES.length, formationRules: FORMATION_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));

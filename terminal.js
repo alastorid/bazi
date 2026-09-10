@@ -102,6 +102,8 @@ function showWorkspace(name) {
   document.querySelectorAll(".workspace-tab").forEach((button) => button.classList.toggle("active", button.dataset.workspaceTab === name));
   el("#queryWorkspace").classList.toggle("active", name === "query");
   el("#visualizationWorkspace").classList.toggle("active", name === "visualization");
+  el(".app-body").classList.toggle("visualization-active", name === "visualization");
+  el("#runSql").hidden = name === "visualization";
   if (name === "visualization") window.BAZI_VISUALIZATION?.activate();
 }
 
@@ -254,6 +256,7 @@ function bindEvents() {
   el("#themeToggle").addEventListener("click", () => {
     document.documentElement.classList.toggle("dark");
     localStorage.setItem("bazi.theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
+    window.BAZI_VISUALIZATION?.redraw?.();
   });
 }
 
@@ -268,7 +271,8 @@ async function boot() {
     state.metadata = await call("init");
     const tableCount = Object.keys(state.metadata.tables ?? { [state.metadata.table]: state.metadata.columns }).length;
     el("#connectionState").textContent = `資料庫 · ${tableCount} 張資料表`;
-    el("#datasetMeta").textContent = `${state.metadata.year} 年 · ${state.metadata.rowCount.toLocaleString()} 筆 · ${state.metadata.columns.length} 欄`;
+    const yearLabel = Array.isArray(state.metadata.years) ? `${state.metadata.years[0]}—${state.metadata.years.at(-1)} 年` : `${state.metadata.year} 年`;
+    el("#datasetMeta").textContent = `${yearLabel} · ${state.metadata.rowCount.toLocaleString()} 筆 · ${state.metadata.columns.length} 欄`;
     el("#runSql").disabled = false;
     await executeSql();
     await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });

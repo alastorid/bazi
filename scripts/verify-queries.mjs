@@ -17,46 +17,30 @@ const translateTop = (source) => {
 };
 const asObjects = (result) => result ? result.values.map((values) => Object.fromEntries(result.columns.map((column, index) => [column, values[index]]))) : [];
 const definitions = window.BAZI_QUERY_LIBRARY.definitions;
-if (definitions.length < 20 || definitions.length > 40) throw new Error(`query library must contain 20–40 entries, got ${definitions.length}`);
-const expectedHeader = ["KEY","命盤連結","公曆日期","時辰","性別"];
-const catalogHeaders = {
-  pattern_catalog: ["名稱","類型","嚴格度","結構稀有度","稀有度說明","吉凶","完整解釋","可計算","可計分","相關星曜","成格條件","教材結果"],
-  relationship_pattern_catalog: ["名稱","類型","適用範圍","完整解釋","條件說明"],
-};
+if (definitions.length < 10 || definitions.length > 24) throw new Error(`query library must contain 10–24 entries, got ${definitions.length}`);
 const seen = new Set();
 const samples = {};
 for (const definition of definitions) {
   if (seen.has(definition.key)) throw new Error(`duplicate sample query key: ${definition.key}`);
   seen.add(definition.key);
   for (const field of ["key","group","label","description","sql"]) if (!definition[field]) throw new Error(`${definition.key} missing metadata field: ${field}`);
-  const expectedColumns = catalogHeaders[definition.key] ?? expectedHeader;
-  if (!catalogHeaders[definition.key] && !definition.sql.includes('JOIN "命盤評分"')) throw new Error(`${definition.key} does not expose the ranking engine`);
+  if (/評分|排名|百分位/.test(`${definition.label} ${definition.description} ${definition.sql}`)) throw new Error(`${definition.key} leaked legacy rating language`);
+  if (!/格局|吉凶/.test(definition.sql)) throw new Error(`${definition.key} does not query pattern data`);
   const result = db.exec(translateTop(definition.sql))[0];
   if (!result) throw new Error(`${definition.key} returned no result set`);
-  if (expectedColumns.some((name,index) => result.columns[index] !== name)) throw new Error(`${definition.key} has inconsistent result header`);
   const objects = asObjects(result);
-  if (!objects.length) throw new Error(`${definition.key} has no 2027 matches; rewrite or remove it`);
-  if (!catalogHeaders[definition.key]) samples[definition.key] = [objects[0], objects[Math.floor(objects.length / 2)], objects.at(-1)].filter(Boolean).map((row) => row.KEY);
+  if (!objects.length) throw new Error(`${definition.key} has no matches; rewrite or remove it`);
+  samples[definition.key] = { columns: result.columns, rows: objects.length };
 }
 const grouped = Object.values(window.BAZI_QUERY_LIBRARY.groups).flat();
 if (grouped.length !== definitions.length || new Set(grouped).size !== definitions.length || grouped.some((key) => !seen.has(key))) throw new Error("sample query groups do not match definitions");
 const count = (sql) => db.exec(sql)[0].values[0][0];
 const legacyWealthRules = count(`SELECT COUNT(*) FROM "評分規則" WHERE "規則ID" IN ('F-HUTAN-CAI','F-LINGTAN-CAI','FEW-FIRE-GREED','FEW-BELL-GREED')`);
 if (legacyWealthRules) throw new Error("legacy 火貪／鈴貪 wealth rules remain in generated database");
-if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "overall_top") throw new Error("unexpected default query");
-const formationQueries = definitions.filter((definition) => definition.sql.includes('JOIN "命盤格局"'));
-if (formationQueries.length < 8) throw new Error(`expected >=8 queries over 命盤格局, got ${formationQueries.length}`);
-for (const key of ["wealth_top","wealth_right_place","career_zisha","career_risk","appearance_moon","research_brightness"]) {
-  const sql = window.BAZI_QUERY_LIBRARY.queries[key];
-  if (!/星曜亮度|星等/.test(sql)) throw new Error(`${key} does not use brightness`);
-}
-for(const key of ["family_best","family_balanced"]){
-  if(!window.BAZI_QUERY_LIBRARY.queries[key]?.includes('JOIN "命盤家庭評分"'))throw new Error(`${key} does not use precomputed family scoring`);
-}
-const normalizedRows = count('SELECT COUNT(*) FROM "星曜亮度" WHERE "星曜"=\'貪狼\' AND "宮位"=\'財帛\' AND "亮度序">=(SELECT "亮度序" FROM "亮度等級" WHERE "亮度"=\'旺\')');
-if (!normalizedRows) throw new Error("normalized brightness comparison returned no rows");
+if (window.BAZI_QUERY_LIBRARY.defaultQuery !== "rare_all") throw new Error("unexpected default query");
+if (definitions.some((definition) => /命盤評分|家庭評分/.test(definition.sql))) throw new Error("sample query library must not use rating tables");
 const formationRows = count('SELECT COUNT(*) FROM "命盤格局" WHERE "成格數">=1');
 if (!formationRows) throw new Error("no chart forms any named formation");
 const halfEmptyFold = count('SELECT COUNT(*) FROM "命盤格局" WHERE "半空折翅"=1 OR "廉貪陷沖命"=1');
-console.log(JSON.stringify({ sampleQueries:definitions.length, groups:Object.keys(window.BAZI_QUERY_LIBRARY.groups).length, defaultQuery:window.BAZI_QUERY_LIBRARY.defaultQuery, formationQueries:formationQueries.length, chartsWithFormation:formationRows, halfEmptyFold, legacyWealthRules, normalizedBrightnessRows:normalizedRows, representativeKeys:samples }, null, 2));
+console.log(JSON.stringify({ sampleQueries:definitions.length, groups:Object.keys(window.BAZI_QUERY_LIBRARY.groups).length, defaultQuery:window.BAZI_QUERY_LIBRARY.defaultQuery, chartsWithFormation:formationRows, halfEmptyFold, legacyWealthRules, queryResults:samples }, null, 2));
 db.close();

@@ -8,16 +8,23 @@ import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/conf
 import { EXPLAINED_STAR_NAMES, UNEXPLAINED_STAR_NAMES } from "../src/explained-stars.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
-const metadata=JSON.parse(fs.readFileSync(path.join(root,"data","metadata.json"),"utf8"));
+const externalDataDir=process.env.BAZI_DATA_DIR ? path.resolve(process.env.BAZI_DATA_DIR) : null;
+const metadata=JSON.parse(fs.readFileSync(externalDataDir ? path.join(externalDataDir,"metadata.json") : path.join(root,"data","metadata.json"),"utf8"));
 const SQL=await initSqlJs({locateFile:(file)=>path.join(root,"node_modules","sql.js","dist",file)});
-const db=new SQL.Database(zlib.gunzipSync(fs.readFileSync(path.join(root,metadata.sqlite))));
+const databasePath=externalDataDir ? path.join(externalDataDir,path.basename(metadata.sqlite)) : path.join(root,metadata.sqlite);
+const db=new SQL.Database(zlib.gunzipSync(fs.readFileSync(databasePath)));
 const rows=(sql)=>{const result=db.exec(sql)[0];return result?result.values.map((values)=>Object.fromEntries(result.columns.map((column,i)=>[column,values[i]]))):[]};
 const scalar=(sql)=>rows(sql)[0]?.n??0;
 
 const count=rows('SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if(count.n!==metadata.rowCount||count.keys!==metadata.rowCount)throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
+if(!Array.isArray(metadata.years)||metadata.years.length<1)throw new Error("year range metadata missing");
+const databaseYears=rows('SELECT DISTINCT "年" AS year FROM "命盤" ORDER BY "年"').map((row)=>row.year);
+if(JSON.stringify(databaseYears)!==JSON.stringify(metadata.years))throw new Error(`year range metadata mismatch: ${JSON.stringify(databaseYears)}`);
+const expectedRangeRows=metadata.years.reduce((total,year)=>total+(new Date(Date.UTC(year+1,0,1))-new Date(Date.UTC(year,0,1)))/86400000*24,0);
+if(metadata.rowCount!==expectedRangeRows)throw new Error(`year range row mismatch: ${metadata.rowCount} versus ${expectedRangeRows}`);
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
-for(const name of ["命盤","星曜定義","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","關係格局規則","格局規則作用","命盤格局","命盤家庭評分","命盤家庭評分明細","命盤婚育時機"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
+for(const name of ["命盤","星曜定義","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","關係格局規則","格局規則作用","命盤格局","命盤格局明細","命盤家庭評分","命盤家庭評分明細","命盤婚育時機"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
 if(objects.has("family_scores"))throw new Error("舊英文 family_scores view 不得保留");
 
 const schemaNames=new Set(rows('PRAGMA table_info("命盤")').map((column)=>column.name));
@@ -64,7 +71,7 @@ for(const spec of specs){
 if(scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "空宮數"<>${specs.map((spec)=>`"${spec.label}是否空宮"`).join("+")}`))throw new Error("incorrect 空宮數");
 const missingRaw=scalar('SELECT COUNT(*) AS n FROM "命盤" WHERE "化祿宮位"=\'\' OR "化權宮位"=\'\' OR "化科宮位"=\'\' OR "化忌宮位"=\'\' OR "命宮"=\'\' OR "身宮"=\'\' OR "身宮宮位"=\'\'');
 if(missingRaw)throw new Error(`${missingRaw} rows have missing required raw fields`);
-const invalidLinks=scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "命盤連結" NOT LIKE 'https://metisziwei.com/chart?y=${metadata.year}&m=%&d=%&h=%&mi=0&g=%'`);
+const invalidLinks=scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "命盤連結" NOT LIKE 'https://metisziwei.com/chart?y='||"年"||'&m=%&d=%&h=%&mi=0&g=%'`);
 if(invalidLinks)throw new Error(`${invalidLinks} rows have invalid chart links`);
 const daXianColumns=metadata.palaces.map((palace)=>`${palace}大限`);
 for(const column of daXianColumns)if(!schemaNames.has(column))throw new Error(`missing da-xian column: ${column}`);
@@ -158,7 +165,7 @@ const formationPredicates={
   "財官雙美":`m."化科宮位"='官祿' AND m."化祿宮位"='財帛'`,
   "武曲七殺同宮":samePalace("武曲","七殺"),
   "武曲破軍同宮":samePalace("武曲","破軍"),
-  "殺星獨守大運":`EXISTS (SELECT 1 FROM (SELECT '命宮' p,m."命宮主星" major,m."命宮全部星" allstars UNION ALL SELECT '兄弟',m."兄弟主星",m."兄弟全部星" UNION ALL SELECT '夫妻',m."夫妻主星",m."夫妻全部星" UNION ALL SELECT '子女',m."子女主星",m."子女全部星" UNION ALL SELECT '財帛',m."財帛主星",m."財帛全部星" UNION ALL SELECT '疾厄',m."疾厄主星",m."疾厄全部星" UNION ALL SELECT '遷移',m."遷移主星",m."遷移全部星" UNION ALL SELECT '僕役',m."僕役主星",m."僕役全部星" UNION ALL SELECT '官祿',m."官祿主星",m."官祿全部星" UNION ALL SELECT '田宅',m."田宅主星",m."田宅全部星" UNION ALL SELECT '福德',m."福德主星",m."福德全部星" UNION ALL SELECT '父母',m."父母主星",m."父母全部星") p WHERE p.major='' AND (${["擎羊","陀羅","火星","鈴星","天空","地劫"].map((star)=>`p.allstars LIKE '%${star}%'`).join(" + ")})=1 AND ${["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`p.allstars NOT LIKE '%${star}%'`).join(" AND ")} AND p.allstars NOT LIKE '%化祿%' AND p.allstars NOT LIKE '%化權%' AND p.allstars NOT LIKE '%化科%')`,
+  "殺星獨守大運":`EXISTS (SELECT 1 FROM (SELECT '命宮' p,m."命宮主星" major,m."命宮全部星" allstars UNION ALL SELECT '兄弟',m."兄弟主星",m."兄弟全部星" UNION ALL SELECT '夫妻',m."夫妻主星",m."夫妻全部星" UNION ALL SELECT '子女',m."子女主星",m."子女全部星" UNION ALL SELECT '財帛',m."財帛主星",m."財帛全部星" UNION ALL SELECT '疾厄',m."疾厄主星",m."疾厄全部星" UNION ALL SELECT '遷移',m."遷移主星",m."遷移全部星" UNION ALL SELECT '僕役',m."僕役主星",m."僕役全部星" UNION ALL SELECT '官祿',m."官祿主星",m."官祿全部星" UNION ALL SELECT '田宅',m."田宅主星",m."田宅全部星" UNION ALL SELECT '福德',m."福德主星",m."福德全部星" UNION ALL SELECT '父母',m."父母主星",m."父母全部星") p WHERE p.major='' AND (${["擎羊","陀羅","火星","鈴星","天空","地劫"].map((star)=>`(p.allstars LIKE '%${star}%')`).join(" + ")})=1 AND ${["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`p.allstars NOT LIKE '%${star}%'`).join(" AND ")} AND p.allstars NOT LIKE '%化祿%' AND p.allstars NOT LIKE '%化權%' AND p.allstars NOT LIKE '%化科%')`,
   "權祿同財帛":`m."化權宮位"='財帛' AND ${inPalace("祿存","財帛")}`,
   "武貪權祿坐命":`${inPalace("武曲","命宮")} AND ${inPalace("貪狼","命宮")} AND m."化權宮位"='命宮' AND m."化祿宮位"='命宮'`,
   "權祿相逢命":`m."化權宮位" IN ${TW} AND m."化祿宮位" IN ${TW}`,
@@ -199,6 +206,7 @@ const formationPredicates={
 
 const formationCount=scalar('SELECT COUNT(*) AS n FROM "命盤格局"');
 if(formationCount!==metadata.rowCount)throw new Error(`formation row mismatch: ${formationCount}`);
+if(scalar('SELECT COUNT(*) AS n FROM "命盤格局明細" d LEFT JOIN "格局規則" r ON r."規則ID"=d."規則ID" WHERE r."規則ID" IS NULL OR r."可計算"<>1 OR d."名稱"<>r."名稱" OR d."類型"<>r."類型" OR d."吉凶"<>r."吉凶" OR d."結構稀有度" IS NOT r."結構稀有度"'))throw new Error("命盤格局明細與格局規則不一致");
 const formationColumns=new Set(rows('PRAGMA table_info("命盤格局")').map((column)=>column.name));
 for(const item of PATTERN_DEFINITIONS.filter((item)=>!item.computable)){
   if(formationColumns.has(item.name))throw new Error(`不可計算格局誤入命盤格局：${item.name}`);
@@ -209,6 +217,8 @@ for(const item of FORMATION_RULES){
   const mismatch=scalar(`SELECT COUNT(*) AS n FROM "命盤" m JOIN "命盤格局" g ON g."KEY"=m."KEY" WHERE g."${item.name}"<>CASE WHEN (${formationPredicates[item.name]}) THEN 1 ELSE 0 END`);
   if(mismatch)throw new Error(`formation flag mismatch for ${item.name}: ${mismatch} rows`);
   formationChecks[item.name]=scalar(`SELECT COUNT(*) AS n FROM "命盤格局" WHERE "${item.name}"=1`);
+  const detailMismatch=scalar(`SELECT COUNT(*) AS n FROM "命盤格局" g LEFT JOIN "命盤格局明細" d ON d."KEY"=g."KEY" AND d."規則ID"='${item.id.replaceAll("'","''")}' WHERE g."${item.name}"<>CASE WHEN d."KEY" IS NULL THEN 0 ELSE 1 END`);
+  if(detailMismatch)throw new Error(`formation detail mismatch for ${item.name}: ${detailMismatch} rows`);
 }
 if(scalar(`SELECT COUNT(*) AS n FROM "命盤格局" WHERE "成格數"<>${FORMATION_RULES.filter((item)=>item.polarity==="吉").map((item)=>`"${item.name}"`).join("+")} OR "凶格數"<>${FORMATION_RULES.filter((item)=>item.polarity==="凶").map((item)=>`"${item.name}"`).join("+")}`))throw new Error("成格數/凶格數 do not match formation flags");
 
@@ -219,7 +229,7 @@ const timingCount=scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機"');
 if(timingCount!==metadata.rowCount*timingAgeCount)throw new Error(`timing row mismatch: ${timingCount}`);
 if(scalar(`SELECT COUNT(*) AS n FROM "命盤婚育時機" t JOIN "命盤" m ON m."KEY"=t."KEY" WHERE t."年齡"<${FAMILY_CONFIG.marriageAgeRange[0]} OR t."年齡">${FAMILY_CONFIG.marriageAgeRange[1]} OR t."年份"<m."年"+t."年齡"-2 OR t."年份">m."年"+t."年齡"`))throw new Error("timing nominal-age/calendar-year resolution mismatch");
 if(scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機" WHERE "年齡"<CAST(SUBSTR("大限範圍",1,INSTR("大限範圍",\'-\')-1) AS INTEGER) OR "年齡">CAST(SUBSTR("大限範圍",INSTR("大限範圍",\'-\')+1) AS INTEGER)'))throw new Error("age outside generated decadal range");
-if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "家庭品質全域百分位" IS NOT NULL'))throw new Error("global percentile must remain unavailable for a single-year artifact");
+if(scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "家庭品質全域百分位" IS NOT NULL'))throw new Error("global percentile must remain unavailable for an independently generated artifact");
 for(const name of FAMILY_PERCENTILE_COMPONENTS)if(scalar(`SELECT COUNT(*) AS n FROM "命盤家庭評分" WHERE "${name}百分位"<0 OR "${name}百分位">100`))throw new Error(`${name} percentile out of range`);
 const positiveExpr='"父母財富分"*2+"父母品質分"*2.5+"自身財富分"*2.5+"外貌分"+"戀愛分"+"婚姻分"*2+"子女分"*2+"家庭時機分"*2';
 const familyRawExpr=`ROUND((${positiveExpr}-"父母負向分"*${FAMILY_CONFIG.parentsNegativePenaltyWeight})/15,2)`;
@@ -255,9 +265,10 @@ for(const rule of ["財-祿存財帛","財-武曲財帛","財-貪狼財帛","商
 }
 if(regression.length<3)throw new Error(`expected >=3 brightness regression pairs, got ${regression.length}`);
 
-const sampleKey=`${metadata.year}0810-子時-女`;
+const sampleYear=metadata.endYear??metadata.years.at(-1);
+const sampleKey=`${sampleYear}0810-子時-女`;
 const sample=rows(`SELECT m."KEY",m."命盤連結",m."命宮",m."身宮",m."空宮數",r."綜合分",r."綜合排名",r."幸運分",g."成格數",g."凶格數" FROM "命盤" m JOIN "命盤評分" r ON r."KEY"=m."KEY" JOIN "命盤格局" g ON g."KEY"=m."KEY" WHERE m."KEY"='${sampleKey}'`)[0];
 if(!sample)throw new Error("required sample key not found");
-if(sample.命盤連結!==`https://metisziwei.com/chart?y=${metadata.year}&m=8&d=10&h=0&mi=0&g=f`)throw new Error(`unexpected sample chart link: ${sample.命盤連結}`);
+if(sample.命盤連結!==`https://metisziwei.com/chart?y=${sampleYear}&m=8&d=10&h=0&mi=0&g=f`)throw new Error(`unexpected sample chart link: ${sample.命盤連結}`);
 console.log(JSON.stringify({ok:true,...count,columns:schemaNames.size,tables:objects.size,missingRaw,invalidLinks,missingDaXian,brightnessRows:brightnessCount,ratingRows:scoreCount,familyRows:familyCount,timingRows:timingCount,parentsNegativePenaltyWeight:FAMILY_CONFIG.parentsNegativePenaltyWeight,legacyWealthRules,formationChecks,brightnessRegression:regression,parentPenaltyComparisons,regressionExtremes,sample},null,2));
 db.close();

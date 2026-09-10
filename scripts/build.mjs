@@ -3,19 +3,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const year = process.argv[2];
+const yearRange = process.argv[2];
 
-if (!year || !/^\d{4}$/.test(year)) {
-  console.error("Usage: npm run build -- <year>\nExample: npm run build -- 2027");
+if (!yearRange || !/^\d{4}(?:-\d{4})?$/.test(yearRange)) {
+  console.error("Usage: npm run build -- <year|start-end>\nExample: npm run build -- 2026-2027");
   process.exit(2);
 }
 
 for (const [script, args] of [
   ["scripts/verify-scoring-model.mjs", []],
-  ["scripts/generate-data.mjs", [year]],
+  ["scripts/generate-data.mjs", [yearRange]],
   ["scripts/verify-data.mjs", []],
   ["scripts/verify-queries.mjs", []],
-  ["scripts/prepare-pages.mjs", [year]],
+  ["scripts/prepare-pages.mjs", [yearRange]],
 ]) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...args], {
     cwd: root,
@@ -24,4 +24,4 @@ for (const [script, args] of [
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-console.log(`\n${year} static site is ready in dist/`);
+console.log(`\n${yearRange} static site is ready in dist/`);

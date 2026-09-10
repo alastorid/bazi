@@ -8,7 +8,7 @@ on:
       year:
         description: Year to generate
         required: true
-        default: "2027"
+        default: "2026-2027"
 
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     env:
-      DATA_YEAR: ${{ inputs.year || '2027' }}
+      DATA_YEAR: ${{ inputs.year || '2026-2027' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

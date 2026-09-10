@@ -80,7 +80,7 @@ Family Quality     = clamp(raw, 0, 100)
 
 Family Balance uses the weighted harmonic mean of the same positive components, then applies the same normalized parent penalty. The harmonic mean was selected because it strongly exposes one low component without making the absolute minimum the whole score.
 
-All PR values use the entire generated year as the denominator. For 2027 that is 8,760 gender-specific birth-time rows; percentiles are never recalculated per month.
+All PR values use the entire generated range as the denominator. For 2026—2027 that is 17,520 gender-specific birth-time rows; percentiles are never recalculated per month.
 
 ## Visualization
 

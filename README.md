@@ -1,10 +1,10 @@
 # bazi — 紫微限定時間範圍反查
 
-Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in a generated year.
+Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in a generated year range.
 
 ## Dataset
 
-- 8,760 rows: 365 days × 12 Chinese two-hour periods × 2 genders.
+- 17,520 rows for 2026—2027: 730 days × 12 Chinese two-hour periods × 2 genders.
 - Primary key format: `YYYYMMDD-時辰-性別`, for example `20270810-子時-女`.
 - Every row has a direct `命盤連結` to its Metis Zi Wei chart.
 - One deliberately wide, first-normal-form SQLite table named `命盤`.
@@ -17,7 +17,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - A direct terrestrial-branch column for every palace, used to verify branch-specific formations such as 日月並明 and 明珠出海.
 - `空宮數` for direct multi-empty-palace research. See [PALACE_SEMANTICS.md](PALACE_SEMANTICS.md).
 - A normalized `星曜亮度` table, ordinal `亮度等級` lookup, and auditable `星曜定義` whitelist with evidence levels (`直接`、`分組`、`組合`).
-- Separate `命盤評分`, `命盤評分明細`, `評分規則`, `格局規則`, `關係格局規則`, and `格局規則作用` tables. The pattern catalog distinguishes formal patterns, strong/conditional combinations, structural rarity, evidence completeness, computability and score eligibility; incomplete named patterns and two-chart relationship patterns cannot silently affect single-chart ranking.
+- Separate `格局規則`, `命盤格局`, `命盤格局明細`, `關係格局規則`, and `格局規則作用` tables. The query library and visualization focus only on auspicious/inauspicious patterns and structural rarity; incomplete named patterns and two-chart relationship patterns cannot silently affect a single-chart result.
 - Separate family-planning scores, yearly PRs, per-age marriage/children timing, and an auditable evidence table. See [FAMILY_SCORING.md](FAMILY_SCORING.md).
 
 The chart generator is a batch-oriented port of `ziwei-doushu/lib/ziwei/algorithm.ts`. It uses the same `iztro` `astro.bySolar` call and `lunar-javascript`; exact traditional Chinese brightness labels are retained for filtering.
@@ -26,7 +26,7 @@ The chart generator is a batch-oriented port of `ziwei-doushu/lib/ziwei/algorith
 
 ```sh
 npm install
-npm run build -- 2027
+npm run build -- 2026-2027
 npm run serve
 ```
 
@@ -36,7 +36,7 @@ Serve `dist/` through an HTTP server. Do not open `index.html` directly because 
 
 Brightness is an input to the scoring engine rather than a display-only label. Only the 36-star evidence whitelist can enter raw columns, palace star lists, brightness data, scoring, queries, or autocomplete; the four transformations remain separate objects. The engine applies star-placement rules, four-transformation rules, then much stronger multi-dimensional combination/formation rules. Raw points are not clamped; the annual percentile assigns SSS–F. See [SCORING.md](SCORING.md) and the source boundary in [NIHAIXIA_SCORING.md](NIHAIXIA_SCORING.md).
 
-Query and Visualization are separate outer workspace tabs. The Visualization tab provides a month-by-24-hour percentile heatmap, Chinese metric controls, minimum filters, best times, score breakdowns, rule explanations, and direct Metis links. Because the source database uses the traditional twelve two-hour periods, adjacent clock-hour cells may intentionally point to the same chart; gender is selected separately.
+SQL Query and Visualization are separate outer tabs. The sample-query panel belongs only to SQL Query and disappears in Visualization. The visualization is an edgeless, horizontally scrollable 2026—2027 timeline over the twelve traditional two-hour periods. Female and male charts are layered in each cell; auspicious and inauspicious patterns are both shown, with intensity based only on structural rarity. A viewport canvas renders only visible dates, while the underlying SQL data is fetched and cached on demand in 31-day chunks instead of scanning the full two-year dataset when the tab opens.
 
 ## Generate another year
 
@@ -49,7 +49,7 @@ No source or UI dates need editing. The site reads its year and date bounds from
 ## GitHub Pages
 
 The repository does not commit a precomputed database. On every deployment,
-GitHub Actions installs the pinned dependencies, runs `npm run build -- 2027`,
+GitHub Actions installs the pinned dependencies, runs `npm run build -- 2026-2027`,
 generates the database on the Actions runner, and publishes only `dist/`.
 The manual workflow accepts a different year input.
 
@@ -63,21 +63,17 @@ WHERE "紫微星等" IN ('廟', '旺')
 ORDER BY "公曆日期";
 ```
 
-For an ordered comparison such as `貪狼在財帛宮 AND 貪狼亮度 >= 旺`, use the normalized schema:
+The sample-query library deliberately contains no rating queries. Its default query is:
 
 ```sql
 SELECT TOP 1000
-  m."KEY", m."命盤連結", b."星曜", b."宮位", b."亮度", b."亮度序",
-  r."財富分", r."財富排名", r."財富百分位"
+  m."KEY", m."命盤連結", m."公曆日期", m."時辰", m."性別",
+  d."名稱" AS "格局", d."類型", d."吉凶", d."結構稀有度",
+  d."成格條件", d."教材結果"
 FROM "命盤" m
-JOIN "星曜亮度" b ON b."KEY" = m."KEY"
-JOIN "命盤評分" r ON r."KEY" = m."KEY"
-WHERE b."星曜" = '貪狼'
-  AND b."宮位" = '財帛'
-  AND b."亮度序" >= (
-    SELECT "亮度序" FROM "亮度等級" WHERE "亮度" = '旺'
-  )
-ORDER BY r."財富分" DESC;
+JOIN "命盤格局明細" d ON d."KEY" = m."KEY"
+WHERE d."吉凶" IN ('吉','凶')
+ORDER BY d."結構稀有度" DESC, m."公曆日期", m."時辰序號", m."性別";
 ```
 
 The browser terminal is read-only. The bundled queries use `SELECT TOP 1000`; custom queries return their exact result without a hidden row cap. CSV export exports the currently displayed result.
