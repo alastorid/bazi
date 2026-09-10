@@ -8,7 +8,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - Primary key format: `YYYYMMDD-時辰-性別`, for example `20270810-子時-女`.
 - Every row has a direct `命盤連結` to its Metis Zi Wei chart.
 - One deliberately wide, first-normal-form SQLite table named `命盤`.
-- Separate columns for every star's exact brightness and palace.
+- Separate brightness and palace columns for exactly the 36 stars explicitly explained by the designated teaching materials; unexplained chart labels are excluded.
 - Separate columns for every palace's major stars and all stars.
 - Twelve palace-specific decadal range columns (`命宮大限` through `父母大限`).
 - Four transformation star/palace pairs: `化祿`, `化權`, `化科`, `化忌`.
@@ -16,7 +16,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 - First-class 空宮 data for every palace: empty flag, opposite palace and stars, effective borrowed stars, and provenance.
 - A direct terrestrial-branch column for every palace, used to verify branch-specific formations such as 日月並明 and 明珠出海.
 - `空宮數` for direct multi-empty-palace research. See [PALACE_SEMANTICS.md](PALACE_SEMANTICS.md).
-- A normalized `星曜亮度` table and ordinal `亮度等級` lookup for direct SQL comparisons.
+- A normalized `星曜亮度` table, ordinal `亮度等級` lookup, and auditable `星曜定義` whitelist with evidence levels (`直接`、`分組`、`組合`).
 - Separate `命盤評分`, `命盤評分明細`, `評分規則`, `格局規則`, and `格局規則作用` tables; raw points, annual percentiles, grades, and every contributing rule remain inspectable without changing the raw `命盤` table.
 - Separate family-planning scores, yearly PRs, per-age marriage/children timing, and an auditable evidence table. See [FAMILY_SCORING.md](FAMILY_SCORING.md).
 
@@ -34,7 +34,7 @@ Serve `dist/` through an HTTP server. Do not open `index.html` directly because 
 
 `build` is the single entry point: it generates SQLite + gzip + metadata, copies the browser SQLite WASM runtime, and verifies row count, unique keys, four transformations, 命宮／身宮, all 12 opposite-palace mappings, empty-palace borrowing, normalized brightness, score reconciliation, brightness regression pairs, and every sample query.
 
-Brightness is an input to the scoring engine rather than a display-only label. The engine now applies star-placement rules, four-transformation rules, then much stronger multi-dimensional combination/formation rules. Raw points are not clamped; the annual percentile assigns SSS–F. See [SCORING.md](SCORING.md) and the source boundary in [NIHAIXIA_SCORING.md](NIHAIXIA_SCORING.md).
+Brightness is an input to the scoring engine rather than a display-only label. Only the 36-star evidence whitelist can enter raw columns, palace star lists, brightness data, scoring, queries, or autocomplete; the four transformations remain separate objects. The engine applies star-placement rules, four-transformation rules, then much stronger multi-dimensional combination/formation rules. Raw points are not clamped; the annual percentile assigns SSS–F. See [SCORING.md](SCORING.md) and the source boundary in [NIHAIXIA_SCORING.md](NIHAIXIA_SCORING.md).
 
 Query and Visualization are separate outer workspace tabs. The Visualization tab provides a month-by-24-hour percentile heatmap, Chinese metric controls, minimum filters, best times, score breakdowns, rule explanations, and direct Metis links. Because the source database uses the traditional twelve two-hour periods, adjacent clock-hour cells may intentionally point to the same chart; gender is selected separately.
 

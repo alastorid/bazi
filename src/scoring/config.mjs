@@ -34,7 +34,6 @@ export const FAMILY_PERCENTILE_COMPONENTS = Object.freeze([
 export const PARENT_SUPPORT_STARS = Object.freeze(["紫微", "天府", "太陽", "太陰", "天梁", "天相"]);
 export const PARENT_WEALTH_STARS = Object.freeze(["紫微", "天府", "武曲", "太陰", "太陽", "祿存"]);
 export const APPEARANCE_STARS = Object.freeze(["太陰", "天相", "天同", "紫微", "貪狼", "廉貞"]);
-export const ROMANCE_STARS = Object.freeze(["紅鸞", "天喜", "天姚", "咸池", "貪狼", "廉貞"]);
+export const ROMANCE_STARS = Object.freeze(["紅鸞", "天喜", "貪狼", "廉貞"]);
 export const SUPPORT_STARS = Object.freeze(["左輔", "右弼", "天魁", "天鉞", "文昌", "文曲", "祿存"]);
-export const CHALLENGING_STARS = Object.freeze(["擎羊", "陀羅", "火星", "鈴星", "地空", "地劫"]);
-
+export const CHALLENGING_STARS = Object.freeze(["擎羊", "陀羅", "火星", "鈴星", "天空", "地劫"]);

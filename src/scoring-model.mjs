@@ -24,6 +24,8 @@ export const RANK_THRESHOLDS = [
   ["B", 35], ["C", 20], ["D", 10], ["E", 4], ["F", 0],
 ];
 
+import { EXPLAINED_STAR_SET } from "./explained-stars.mjs";
+
 // 星性質依倪師定義：紫微系善星與六吉為 benefic；武曲（財星王兼武官）、
 // 廉貞、貪狼、巨門（凶星但廟旺口才好、巨富）為 mixed；殺破狼與六殺（擎羊、
 // 陀羅、火星、鈴星、天空、地劫）及天刑（是非官司刑剋）為 challenging。
@@ -32,11 +34,16 @@ export const STAR_NATURE = {
   太陰: "benefic", 天相: "benefic", 天梁: "benefic", 左輔: "benefic", 右弼: "benefic",
   文昌: "benefic", 文曲: "benefic", 天魁: "benefic", 天鉞: "benefic", 祿存: "benefic",
   武曲: "mixed", 廉貞: "mixed", 貪狼: "mixed", 巨門: "mixed",
-  天馬: "mixed", 紅鸞: "mixed", 天喜: "mixed", 天姚: "mixed", 咸池: "mixed",
+  天馬: "mixed", 紅鸞: "mixed", 天喜: "mixed",
   七殺: "challenging", 破軍: "challenging",
   擎羊: "challenging", 陀羅: "challenging", 火星: "challenging", 鈴星: "challenging",
-  地空: "challenging", 地劫: "challenging", 天刑: "challenging",
+  天空: "challenging", 地空: "challenging", 地劫: "challenging", 天刑: "challenging",
+  三台: "benefic", 八座: "benefic", 天巫: "benefic", 解神: "benefic",
 };
+
+for (const star of Object.keys(STAR_NATURE)) {
+  if (!EXPLAINED_STAR_SET.has(star)) throw new Error(`未解釋星曜不得進入星性表：${star}`);
+}
 
 // 倪師亮度法：吉星廟旺吉；平閒無用（吉星陷近乎無力）；殺星廟旺為凶處藏吉
 // （可控），殺星落陷大凶；巨門等 mixed 星廟旺成格、落陷主牢獄。
@@ -127,7 +134,7 @@ function buildContext(chart) {
     return Boolean(pa && pb && pa !== pb && neighbors.length === 2 && neighbors.includes(pa) && neighbors.includes(pb));
   };
   const auxStars = ["左輔", "右弼", "天魁", "天鉞", "文昌", "文曲", "祿存"];
-  const shaStars = ["擎羊", "陀羅", "火星", "鈴星", "地空", "地劫"];
+  const shaStars = ["擎羊", "陀羅", "火星", "鈴星", "天空", "地劫"];
   return {
     chart, palaces, byPalace, byBranch, stars, at, inPalace, inBranch, orderOf, isFallen, samePalace,
     siHua, mutagenPalace: (m) => siHua.get(m)?.palace ?? "", mutagenStar: (m) => siHua.get(m)?.name ?? "",
@@ -284,7 +291,7 @@ export const FORMATION_RULES = [
   formation("F-GUAN-KONG", "官祿空宮", "凶", "官運", -300, "官祿宮空宮",
     "官祿宮無主星：不利官運",
     (c) => c.majorNames("官祿").length === 0),
-  formation("F-LIUSHA-GUAN", "六煞入官祿", "凶", "事業", -200, "擎羊、陀羅、火星、鈴星、地空、地劫",
+  formation("F-LIUSHA-GUAN", "六煞入官祿", "凶", "事業", -200, "擎羊、陀羅、火星、鈴星、天空、地劫",
     "六煞星任一入官祿宮：事業受阻",
     (c) => c.shaStars.some((s) => c.inPalace(s, "官祿"))),
   formation("F-WUGUAN-KE-MING", "武官化科坐命", "吉", "專業", 500, "武官星、化科",

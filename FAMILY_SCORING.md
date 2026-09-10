@@ -26,7 +26,7 @@ It also stores yearly percentiles for every positive/composite component, Family
 
 `命盤婚育時機` stores one row per chart per configured age. The default range is nominal age 25–35, or eleven rows per chart. `命盤家庭評分明細` stores each natal and timing contribution used in the score.
 
-The read-only `family_scores` view exposes the same outputs with stable English SQL names such as `parents_quality_score`, `stable_wealth_score`, `marriage_timing_score`, `family_quality_pr_year`, and `children_palace_has_major_star`, together with `birth_datetime` and `metis_url`.
+所有欄位只由中文資料表 `命盤家庭評分` 提供，不再建立舊版英文相容 view，以免污染 SQL 自動完成。
 
 ## Brightness behavior
 
@@ -41,7 +41,7 @@ The family scorer uses the same context-sensitive response curves as the core sc
 - Explosive Wealth (compatibility column name): only source-backed 《天紀》 wealth patterns—太陽入財帛（橫財）、廟旺巨日會命、祿馬交馳、權祿相逢. The previous 財帛火貪／鈴貪 and generic 殺破狼 bonuses were removed from scoring.
 - Self Wealth: `78% stable + 22% explosive`, configured independently.
 - Appearance: the existing brightness-aware appearance score plus lower-weight body-palace effects.
-- Romance: 紅鸞、天喜、天姚、咸池、貪狼、廉貞 in relationship-relevant palaces; this is independent of appearance.
+- 戀愛：僅使用教材有明確解釋的紅鸞、天喜、貪狼、廉貞；不再依據命盤上單純出現的天姚、咸池加分。
 - Marriage: natal 夫妻 conditions combined with the strongest configured-age timing score.
 - Children: 真子女宮 major-star strength, brightness, support/challenging stars, transformations, and the strongest children timing score.
 

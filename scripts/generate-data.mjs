@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { generateChart, HOURS, GENDERS } from "../src/ziwei-algorithm.mjs";
+import { EXPLAINED_STAR_NAMES, EXPLAINED_STAR_SET, STAR_DEFINITIONS } from "../src/explained-stars.mjs";
 import {
   BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG,
   FORMATION_EFFECTS, FORMATION_RULES, RANK_THRESHOLDS, STAR_NATURE, STAR_RULES,
@@ -39,6 +40,7 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const quoteIdent = (value) => `"${String(value).replaceAll('"', '""')}"`;
 const dates = datesOfYear(year);
 const brightnessRank = new Map(BRIGHTNESS_LEVELS);
+const evidenceLevelLabel = Object.freeze({ direct: "直接", group: "分組", combination: "組合" });
 const familyScoreFields = [
   ["父母分","parents"],["父母財富分","parentsWealth"],["父母負向分","parentsNegative"],["父母品質分","parentsQuality"],
   ["穩定財富分","stableWealth"],["爆發財富分","explosiveWealth"],["自身財富分","selfWealth"],["外貌分","appearance"],
@@ -52,15 +54,13 @@ const familyPercentileScore = new Map(FAMILY_PERCENTILE_COMPONENTS.map((name) =>
 // across its twelve palaces. One representative chart is therefore sufficient
 // to discover the wide-table schema; every requested row is still calculated
 // independently below (including both genders).
-const starNames = new Set();
 const palaceNames = new Set();
 const schemaChart = generateChart({ ...dates[0], hour: 0, gender: "male" });
 for (const palace of schemaChart.palaces) {
   palaceNames.add(palace.name);
-  for (const star of palace.stars) starNames.add(star.name);
 }
 
-const stars = [...starNames].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+const stars = [...EXPLAINED_STAR_NAMES].sort((a, b) => a.localeCompare(b, "zh-Hant"));
 const preferredPalaces = ["命宮", "兄弟", "夫妻", "子女", "財帛", "疾厄", "遷移", "僕役", "交友", "官祿", "田宅", "福德", "父母"];
 const palaces = [...palaceNames].sort((a, b) => {
   const ai = preferredPalaces.indexOf(a);
@@ -133,6 +133,10 @@ db.run('CREATE TABLE "亮度等級" ("亮度" TEXT PRIMARY KEY, "亮度序" INTE
 const brightnessLevelInsert = db.prepare('INSERT INTO "亮度等級" VALUES (?, ?)');
 for (const level of BRIGHTNESS_LEVELS) brightnessLevelInsert.run(level);
 brightnessLevelInsert.free();
+db.run('CREATE TABLE "星曜定義" ("星曜" TEXT PRIMARY KEY, "類型" TEXT NOT NULL, "解釋層級" TEXT NOT NULL, "核心含義" TEXT NOT NULL, "使用限制" TEXT NOT NULL)');
+const starDefinitionInsert = db.prepare('INSERT INTO "星曜定義" VALUES (?, ?, ?, ?, ?)');
+for (const item of STAR_DEFINITIONS) starDefinitionInsert.run([item.name, item.category, evidenceLevelLabel[item.explanationLevel], item.meaning, item.usageLimit]);
+starDefinitionInsert.free();
 db.run('CREATE TABLE "星曜亮度" ("KEY" TEXT NOT NULL REFERENCES "命盤"("KEY"), "星曜" TEXT NOT NULL, "宮位" TEXT NOT NULL, "星曜類型" TEXT NOT NULL, "星性質" TEXT NOT NULL, "亮度" TEXT NOT NULL, "亮度序" INTEGER NOT NULL, "四化" TEXT NOT NULL, PRIMARY KEY ("KEY", "星曜"))');
 db.run('CREATE INDEX "idx_星曜亮度_查詢" ON "星曜亮度"("星曜", "宮位", "亮度序", "KEY")');
 
@@ -235,7 +239,7 @@ for (const date of dates) {
       for (const palaceName of palaces) {
         const palace = byPalace.get(palaceName);
         values[`${palaceName}主星`] = palace?.stars.filter((star) => star.type === "major").map((star) => star.name).join("、") ?? "";
-        values[`${palaceName}全部星`] = palace?.stars.map((star) => `${star.name}${star.siHua ? `化${star.siHua}` : ""}${star.brightness ? `(${star.brightness})` : ""}`).join("、") ?? "";
+        values[`${palaceName}全部星`] = palace?.stars.filter((star) => EXPLAINED_STAR_SET.has(star.name)).map((star) => `${star.name}${star.siHua ? `化${star.siHua}` : ""}${star.brightness ? `(${star.brightness})` : ""}`).join("、") ?? "";
         values[`${palaceName}大限`] = palace?.daXianRange?.length === 2 ? `${palace.daXianRange[0]}-${palace.daXianRange[1]}` : "";
       }
       let emptyCount = 0;
@@ -263,6 +267,7 @@ for (const date of dates) {
       insert.run(columns.map(([name]) => values[name] ?? ""));
       for (const palace of chart.palaces) {
         for (const star of palace.stars) {
+          if (!EXPLAINED_STAR_SET.has(star.name)) continue;
           const brightnessOrder = brightnessRank.get(star.brightness);
           if (!brightnessOrder) continue;
           brightnessInsert.run([
@@ -356,25 +361,6 @@ FROM "_家庭含百分位"`);
 db.run('CREATE UNIQUE INDEX "idx_家庭評分_KEY" ON "命盤家庭評分"("KEY")');
 db.run('CREATE INDEX "idx_家庭評分_品質" ON "命盤家庭評分"("家庭品質百分位" DESC)');
 db.run('CREATE INDEX "idx_家庭評分_平衡" ON "命盤家庭評分"("家庭平衡百分位" DESC)');
-db.run(`CREATE VIEW "family_scores" AS SELECT
-  f."KEY" AS "KEY", f."出生時間" AS "birth_datetime", m."命盤連結" AS "metis_url",
-  f."父母分" AS "parents_score", f."父母百分位" AS "parents_pr_year",
-  f."父母財富分" AS "parents_wealth_score", f."父母財富百分位" AS "parents_wealth_pr_year",
-  f."父母負向分" AS "parents_negative_score", f."父母品質分" AS "parents_quality_score", f."父母品質百分位" AS "parents_quality_pr_year",
-  f."穩定財富分" AS "stable_wealth_score", f."穩定財富百分位" AS "stable_wealth_pr_year",
-  f."爆發財富分" AS "explosive_wealth_score", f."爆發財富百分位" AS "explosive_wealth_pr_year",
-  f."自身財富分" AS "self_wealth_score", f."自身財富百分位" AS "self_wealth_pr_year",
-  f."外貌分" AS "appearance_score", f."外貌百分位" AS "appearance_pr_year",
-  f."戀愛分" AS "romance_score", f."戀愛百分位" AS "romance_pr_year",
-  f."婚姻分" AS "marriage_score", f."婚姻百分位" AS "marriage_pr_year", f."婚姻時機分" AS "marriage_timing_score", f."婚姻時機百分位" AS "marriage_timing_pr_year",
-  f."子女分" AS "children_score", f."子女百分位" AS "children_pr_year", f."真子女宮強度分" AS "children_palace_strength", f."子女時機分" AS "children_timing_score",
-  f."家庭品質原始分" AS "family_quality_raw", f."家庭品質分" AS "family_quality_score", f."家庭品質百分位" AS "family_quality_pr_year", f."家庭品質全域百分位" AS "family_quality_pr_global",
-  f."家庭平衡分" AS "family_balance_score", f."家庭平衡百分位" AS "family_balance_pr_year",
-  f."真子女宮有主星" AS "children_palace_has_major_star", f."真子女宮來源" AS "children_palace_source",
-  f."最佳婚姻年齡" AS "best_marriage_age", f."最佳婚姻年份" AS "best_marriage_year", f."婚姻窗口起始年齡" AS "marriage_window_start_age", f."婚姻窗口結束年齡" AS "marriage_window_end_age",
-  f."最佳子女年齡" AS "best_children_age", f."最佳子女年份" AS "best_children_year", f."婚姻觸發數" AS "marriage_trigger_count",
-  f."大限紅鸞" AS "major_period_hongluan", f."大限天喜" AS "major_period_tianxi", f."小限紅鸞" AS "minor_period_hongluan", f."小限天喜" AS "minor_period_tianxi"
-FROM "命盤家庭評分" f JOIN "命盤" m ON m."KEY"=f."KEY"`);
 db.run('DROP TABLE "_家庭含百分位"');
 db.run('DROP TABLE "_命盤家庭原始評分"');
 
@@ -396,8 +382,6 @@ const familyMetadataNames = [
 const familyIntegerNames = new Set(["時辰代表小時","真子女宮有主星","最佳婚姻年齡","最佳婚姻年份","婚姻窗口起始年齡","婚姻窗口結束年齡","最佳子女年齡","最佳子女年份","婚姻觸發數","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜"]);
 const familyTextNames = new Set(["KEY","出生時間","真子女宮來源","婚姻主要原因","子女主要原因","家庭品質排名","家庭平衡排名"]);
 const familyMetadata = familyMetadataNames.map((name)=>({name,type:familyTextNames.has(name)?"TEXT":familyIntegerNames.has(name)?"INTEGER":"REAL"}));
-const familyViewIntegerNames = new Set(["children_palace_has_major_star","best_marriage_age","best_marriage_year","marriage_window_start_age","marriage_window_end_age","best_children_age","best_children_year","marriage_trigger_count","major_period_hongluan","major_period_tianxi","minor_period_hongluan","minor_period_tianxi"]);
-const familyViewMetadata = ["KEY","birth_datetime","metis_url","parents_score","parents_pr_year","parents_wealth_score","parents_wealth_pr_year","parents_negative_score","parents_quality_score","parents_quality_pr_year","stable_wealth_score","stable_wealth_pr_year","explosive_wealth_score","explosive_wealth_pr_year","self_wealth_score","self_wealth_pr_year","appearance_score","appearance_pr_year","romance_score","romance_pr_year","marriage_score","marriage_pr_year","marriage_timing_score","marriage_timing_pr_year","children_score","children_pr_year","children_palace_strength","children_timing_score","family_quality_raw","family_quality_score","family_quality_pr_year","family_quality_pr_global","family_balance_score","family_balance_pr_year","children_palace_has_major_star","children_palace_source","best_marriage_age","best_marriage_year","marriage_window_start_age","marriage_window_end_age","best_children_age","best_children_year","marriage_trigger_count","major_period_hongluan","major_period_tianxi","minor_period_hongluan","minor_period_tianxi"].map((name)=>({name,type:["KEY","birth_datetime","metis_url","children_palace_source"].includes(name)?"TEXT":familyViewIntegerNames.has(name)?"INTEGER":"REAL"}));
 const metadata = {
   version: 1,
   generatedAt: new Date().toISOString(),
@@ -408,6 +392,7 @@ const metadata = {
   table: "命盤",
   tables: {
     命盤: columns.map(([name, type]) => ({ name, type: type.split(" ")[0] })),
+    星曜定義: ["星曜","類型","解釋層級","核心含義","使用限制"].map((name) => ({ name, type: "TEXT" })),
     星曜亮度: ["KEY","星曜","宮位","星曜類型","星性質","亮度","亮度序","四化"].map((name) => ({ name, type: name === "亮度序" ? "INTEGER" : "TEXT" })),
     亮度等級: [{ name:"亮度", type:"TEXT" }, { name:"亮度序", type:"INTEGER" }],
     命盤評分: ratingMetadata,
@@ -421,7 +406,6 @@ const metadata = {
     命盤家庭評分: familyMetadata,
     命盤家庭評分明細: ["KEY","規則ID","組件","類型","星曜","宮位","亮度","亮度序","亮度倍率","基礎作用","實際貢獻","年齡","年份","說明"].map((name)=>({name,type:["亮度倍率","基礎作用","實際貢獻"].includes(name)?"REAL":["亮度序","年齡","年份"].includes(name)?"INTEGER":"TEXT"})),
     命盤婚育時機: ["KEY","年齡","年份","大限範圍","大限本命宮位","小限本命宮位","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻觸發數","婚姻觸發分","子女觸發分","家庭時機分","婚姻原因","子女原因"].map((name)=>({name,type:["婚姻觸發分","子女觸發分","家庭時機分"].includes(name)?"REAL":["年齡","年份","大限紅鸞","大限天喜","小限紅鸞","小限天喜","流年紅鸞","流年天喜","婚姻觸發數"].includes(name)?"INTEGER":"TEXT"})),
-    family_scores: familyViewMetadata,
   },
   sqlite: `data/ziwei-${year}.sqlite.gz`,
   hash,
@@ -438,6 +422,8 @@ const metadata = {
     standard: "倪海廈《天紀》紫微斗數：四化為主、命宮三方四正論總格、星得正位、吉處藏凶必凶",
     sources: ["天纪-天机道.pdf", "紫微斗数案例资料.doc", "天机道听课笔记.doc"],
     starRules: STAR_RULES.length,
+    explainedStars: STAR_DEFINITIONS.length,
+    starEvidenceLevels: ["直接", "分組", "組合"],
     transformRules: TRANSFORM_RULES.length,
     formationRules: FORMATION_RULES.length,
     configuration: DIMENSION_CONFIG,

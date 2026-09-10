@@ -105,7 +105,7 @@ export function scoreFamily(chart, gender = "男") {
   let romance = 34;
   for (const star of ROMANCE_STARS) {
     const item=byName.get(star); if(!item || !["命宮","夫妻","福德","遷移"].includes(item.palace)) continue;
-    const base=["紅鸞","天喜"].includes(star)?9:["天姚","咸池"].includes(star)?6:5;
+    const base=["紅鸞","天喜"].includes(star)?9:5;
     const factor=item.brightness?brightnessFactor(star,item.brightness,base):1;
     const value=round(base*factor); romance+=value; addEvidence("戀愛",`FR-${star}`,"桃花／關係星",base,value,`${star}在${item.palace}`,item);
   }

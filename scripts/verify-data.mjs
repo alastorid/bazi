@@ -5,6 +5,7 @@ import initSqlJs from "sql.js";
 import { fileURLToPath } from "node:url";
 import { BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG, FORMATION_RULES } from "../src/scoring-model.mjs";
 import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
+import { EXPLAINED_STAR_NAMES, UNEXPLAINED_STAR_NAMES } from "../src/explained-stars.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const metadata=JSON.parse(fs.readFileSync(path.join(root,"data","metadata.json"),"utf8"));
@@ -16,9 +17,25 @@ const scalar=(sql)=>rows(sql)[0]?.n??0;
 const count=rows('SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if(count.n!==metadata.rowCount||count.keys!==metadata.rowCount)throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
-for(const name of ["命盤","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","格局規則作用","命盤格局","命盤家庭評分","命盤家庭評分明細","命盤婚育時機","family_scores"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
+for(const name of ["命盤","星曜定義","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","格局規則作用","命盤格局","命盤家庭評分","命盤家庭評分明細","命盤婚育時機"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
+if(objects.has("family_scores"))throw new Error("舊英文 family_scores view 不得保留");
 
 const schemaNames=new Set(rows('PRAGMA table_info("命盤")').map((column)=>column.name));
+const expectedStars=[...EXPLAINED_STAR_NAMES].sort((a,b)=>a.localeCompare(b,"zh-Hant"));
+if(JSON.stringify(metadata.stars)!==JSON.stringify(expectedStars))throw new Error("metadata stars do not exactly match the 36-star explained whitelist");
+const definitions=rows('SELECT "星曜","解釋層級" FROM "星曜定義" ORDER BY "星曜"');
+if(definitions.length!==36||definitions.some((row)=>!["直接","分組","組合"].includes(row.解釋層級)))throw new Error("星曜定義必須包含 36 筆有證據層級的資料");
+for(const star of expectedStars)for(const suffix of ["星等","宮位"])if(!schemaNames.has(`${star}${suffix}`))throw new Error(`missing explained-star column: ${star}${suffix}`);
+for(const star of UNEXPLAINED_STAR_NAMES)for(const suffix of ["星等","宮位"])if(schemaNames.has(`${star}${suffix}`))throw new Error(`unexplained-star column leaked into 命盤: ${star}${suffix}`);
+const expectedStarSet=new Set(expectedStars);
+for(const palace of metadata.palaces){
+  for(const row of rows(`SELECT DISTINCT "${palace}全部星" AS value FROM "命盤" WHERE "${palace}全部星"<>''`)){
+    for(const token of row.value.split("、")){
+      const star=token.replace(/化[祿權科忌]/u,"").replace(/\([^)]*\)$/u,"");
+      if(!expectedStarSet.has(star))throw new Error(`unexplained star leaked into ${palace}全部星: ${star}`);
+    }
+  }
+}
 const specs=metadata.palaceSemantics;
 if(!Array.isArray(specs)||specs.length!==12)throw new Error(`expected 12 palace semantics, got ${specs?.length}`);
 const byLabel=new Map(specs.map((spec)=>[spec.label,spec]));
@@ -51,6 +68,16 @@ for(const star of metadata.stars){
   if(bad)throw new Error(`${bad} normalized brightness mismatches for ${star}`);
 }
 if(scalar('SELECT COUNT(*) AS n FROM "星曜亮度" b LEFT JOIN "亮度等級" l ON l."亮度"=b."亮度" AND l."亮度序"=b."亮度序" WHERE l."亮度" IS NULL'))throw new Error("invalid normalized brightness order");
+const explainedSql=expectedStars.map((star)=>`'${star.replaceAll("'","''")}'`).join(",");
+if(scalar(`SELECT COUNT(*) AS n FROM "星曜亮度" WHERE "星曜" NOT IN (${explainedSql})`))throw new Error("unexplained star leaked into 星曜亮度");
+for(const star of UNEXPLAINED_STAR_NAMES){
+  const safe=star.replaceAll("'","''");
+  const allStarLeak=metadata.palaces.map((palace)=>`"${palace}全部星" LIKE '%${safe}%'`).join(" OR ");
+  if(scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE ${allStarLeak}`))throw new Error(`unexplained star leaked into 全部星: ${star}`);
+  for(const table of ["評分規則","命盤評分明細","命盤家庭評分明細"]){
+    if(scalar(`SELECT COUNT(*) AS n FROM "${table}" WHERE "星曜" LIKE '%${safe}%'`))throw new Error(`unexplained star leaked into ${table}: ${star}`);
+  }
+}
 
 const scoreCount=scalar('SELECT COUNT(*) AS n FROM "命盤評分"');
 if(scoreCount!==metadata.rowCount)throw new Error(`rating row mismatch: ${scoreCount}`);
@@ -104,7 +131,7 @@ const formationPredicates={
   "機月同梁":`m."天機宮位" IN ${TW} AND m."天梁宮位" IN ${TW} AND m."太陰宮位" IN ${TW} AND m."天同宮位" IN ${TW}`,
   "紫微七殺官祿":`${inPalace("紫微","官祿")} AND ${inPalace("七殺","官祿")}`,
   "日月夾財":`m."命宮主星"='' AND ${straddle("太陽","太陰")} AND m."太陽星等" IN (${BRIGHT}) AND m."太陰星等" IN (${BRIGHT})`,
-  "凶處藏吉":`((m."擎羊宮位" IN ${TW}) OR (m."陀羅宮位" IN ${TW}) OR (m."火星宮位" IN ${TW}) OR (m."鈴星宮位" IN ${TW}) OR (m."地空宮位" IN ${TW}) OR (m."地劫宮位" IN ${TW})) AND ${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>`(NOT (m."${star}宮位" IN ${TW}) OR m."${star}星等" IN ('平','利','得','旺','廟'))`).join(" AND ")} AND (${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>brightIn(star,"命宮",BRIGHT)).join(" OR ")})`,
+  "凶處藏吉":`((m."擎羊宮位" IN ${TW}) OR (m."陀羅宮位" IN ${TW}) OR (m."火星宮位" IN ${TW}) OR (m."鈴星宮位" IN ${TW}) OR (m."天空宮位" IN ${TW}) OR (m."地劫宮位" IN ${TW})) AND ${["擎羊","陀羅","火星","鈴星","天空","地劫"].map((star)=>`(NOT (m."${star}宮位" IN ${TW}) OR m."${star}星等" IN ('平','利','得','旺','廟'))`).join(" AND ")} AND (${["紫微","天府","太陽","太陰","天同","天梁","天相"].map((star)=>brightIn(star,"命宮",BRIGHT)).join(" OR ")})`,
   "廉殺廟旺":lianPair(["廉貞","七殺"],true),
   "昌曲會命":`m."文昌宮位" IN ${TW} AND m."文曲宮位" IN ${TW}`,
   "魁鉞會命":`m."天魁宮位" IN ${TW} AND m."天鉞宮位" IN ${TW}`,
@@ -119,7 +146,7 @@ const formationPredicates={
   "權祿會命":`m."化權宮位" IN ${TW} AND m."化祿宮位" IN ${TW}`,
   "官祿權財":`m."化權宮位"='官祿' AND (m."化祿宮位"='官祿' OR ${inPalace("祿存","官祿")} OR ${inPalace("武曲","官祿")} OR ${inPalace("貪狼","官祿")})`,
   "官祿空宮":`m."官祿主星"=''`,
-  "六煞入官祿":`(${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>inPalace(star,"官祿")).join(" OR ")})`,
+  "六煞入官祿":`(${["擎羊","陀羅","火星","鈴星","天空","地劫"].map((star)=>inPalace(star,"官祿")).join(" OR ")})`,
   "武官化科坐命":`(${["七殺","破軍","貪狼","武曲"].map((star)=>inPalace(star,"命宮")).join(" OR ")}) AND m."化科宮位"='命宮'`,
   "科權會命":`m."化科宮位" IN ${TW} AND m."化權宮位" IN ${TW}`,
   "魁鉞化科會命":`m."天魁宮位" IN ${TW} AND m."天鉞宮位" IN ${TW} AND m."化科宮位" IN ${TW}`,
@@ -140,7 +167,7 @@ const formationPredicates={
   "廉貪同夫妻":`${samePalace("廉貞","貪狼")} AND m."廉貞宮位"='夫妻'`,
   "廉貪落陷":lianPair(["廉貞","貪狼"],false),
   "武殺落陷":lianPair(["武曲","七殺"],false),
-  "吉處藏凶":`((${["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`m."${star}宮位" IN ${TW}`).join(")+(")}))>=2 AND ((${["擎羊","陀羅","火星","鈴星","地空","地劫"].map((star)=>`(m."${star}宮位" IN ${TW} AND m."${star}星等" IN (${FALLEN}))`).join(" OR ")}))`,
+  "吉處藏凶":`((${["左輔","右弼","天魁","天鉞","文昌","文曲","祿存"].map((star)=>`m."${star}宮位" IN ${TW}`).join(")+(")}))>=2 AND ((${["擎羊","陀羅","火星","鈴星","天空","地劫"].map((star)=>`(m."${star}宮位" IN ${TW} AND m."${star}星等" IN (${FALLEN}))`).join(" OR ")}))`,
   "輔弼孤星":`m."紫微宮位"<>'命宮' AND ((m."左輔宮位"='命宮')+(m."右弼宮位"='命宮'))=1`,
   "紫微無輔":`${inPalace("紫微","命宮")} AND m."左輔宮位" NOT IN ${TW} AND m."右弼宮位" NOT IN ${TW}`,
   "殺破狼會命":`${["七殺","破軍","貪狼"].map((star)=>`m."${star}宮位" IN ${TW}`).join(" AND ")}`,
@@ -168,7 +195,6 @@ if(scalar(`SELECT COUNT(*) AS n FROM "命盤格局" WHERE "成格數"<>${FORMATI
 
 const familyCount=scalar('SELECT COUNT(*) AS n FROM "命盤家庭評分"');
 if(familyCount!==metadata.rowCount)throw new Error(`family rating row mismatch: ${familyCount}`);
-if(scalar('SELECT COUNT(*) AS n FROM "family_scores"')!==metadata.rowCount)throw new Error("family_scores view row mismatch");
 const timingAgeCount=FAMILY_CONFIG.marriageAgeRange[1]-FAMILY_CONFIG.marriageAgeRange[0]+1;
 const timingCount=scalar('SELECT COUNT(*) AS n FROM "命盤婚育時機"');
 if(timingCount!==metadata.rowCount*timingAgeCount)throw new Error(`timing row mismatch: ${timingCount}`);
