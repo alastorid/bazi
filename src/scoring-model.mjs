@@ -432,7 +432,7 @@ export const KNOWN_INCOMPLETE_PATTERNS = Object.freeze([
   { id: "K-ZIFU-JIAQUAN", name: "紫府夾權", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "紫微、天府", description: "教材只列格名：完整狹義條件與結果不足，不自行補規則", knownPattern: 1, fullyExplained: 0, computable: 0 },
   { id: "K-KUIYUE-JIAGUI", name: "魁鉞夾貴", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "天魁、天鉞", description: "教材只列格名：完整狹義條件與結果不足，不自行補規則", knownPattern: 1, fullyExplained: 0, computable: 0 },
   { id: "K-YANGTUO-JIASHA", name: "羊陀夾殺", type: "已知格名", strictness: "條件不完整", rarity: null, polarity: "未定", stars: "擎羊、陀羅", description: "教材只列格名：完整狹義條件與結果不足，不自行補規則", knownPattern: 1, fullyExplained: 0, computable: 0 },
-  { id: "K-HONGXI-HUI", name: "紅鸞天喜交會", type: "強組合", strictness: "所在宮條件待限定", rarity: 2, polarity: "條件", stars: "紅鸞、天喜", description: "紅鸞天喜交會主婚姻事件強；所在宮凶仍可破壞結果，未限定所在宮前不計分", knownPattern: 1, fullyExplained: 0, computable: 0 },
+  { id: "K-HONGXI-HUI", name: "紅鸞天喜交會", type: "強組合", strictness: "所在宮條件待限定", rarity: 2, polarity: "條件", stars: "紅鸞、天喜", description: "紅鸞與天喜交會，再看所在宮：婚姻事件很強；所在宮凶可破壞結果。未限定交會與所在宮條件前不計算、不計分", knownPattern: 1, fullyExplained: 0, computable: 0 },
 ]);
 
 export const RELATIONSHIP_PATTERN_DEFINITIONS = Object.freeze([
@@ -457,6 +457,7 @@ export const FORMATION_EFFECTS = {
   "F-XIONGSU": { 事業: 500, 經商: 500, 桃花: -300, 婚姻: -300 },
   "F-KEQUANLU": { 幸運: 999, 官運: 999, 事業: 500 },
   "F-LUMA": { 財富: 999, 幸運: 500 },
+  "F-FUXIANG": { 事業: 300, 官運: 300 },
   "F-MINGLU": { 財富: 300 },
   "F-ZISHA-GUAN": { 官運: 500, 事業: 500 },
   "F-QUANLU-CAI": { 財富: 300 },
