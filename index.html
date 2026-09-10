@@ -31,12 +31,12 @@
       <section id="queryWorkspace" class="workspace-view query-workspace active">
       <section class="query-pane">
         <div class="pane-tabs">
-          <button class="query-tab active" type="button">查詢一.sql</button>
+          <button class="query-tab active" type="button">查詢一</button>
           <span id="queryState">就緒</span>
         </div>
         <div class="editor-wrap">
           <div class="line-numbers" id="lineNumbers">1</div>
-          <textarea id="sqlEditor" aria-label="SQL 查詢" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+          <textarea id="sqlEditor" aria-label="查詢內容" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
           <div id="autocomplete" class="autocomplete" hidden></div>
         </div>
       </section>
@@ -48,7 +48,7 @@
           <button class="result-tab active" data-result-tab="results" type="button">結果</button>
           <button class="result-tab" data-result-tab="messages" type="button">訊息</button>
           <span id="resultMeta"></span>
-          <button id="exportCsv" type="button" disabled>匯出 CSV</button>
+          <button id="exportCsv" type="button" disabled>匯出表格</button>
         </div>
         <div id="resultsView" class="result-view active">
           <div class="data-grid" id="dataGrid">
@@ -73,8 +73,8 @@
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="queryLibrary.js?v=7" defer></script>
+    <script src="queryLibrary.js?v=8" defer></script>
     <script src="visualization.js?v=2" defer></script>
-    <script src="terminal.js?v=15" defer></script>
+    <script src="terminal.js?v=16" defer></script>
   </body>
 </html>

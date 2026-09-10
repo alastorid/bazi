@@ -81,7 +81,7 @@ function renderResult() {
     const className = value === null ? "null" : typeof value === "number" ? "number" : "";
     const display = typeof value === "string" && /^https:\/\/metisziwei\.com\/chart\?/.test(value)
       ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener noreferrer">${escapeHtml(value)}</a>`
-      : value === null ? "NULL" : escapeHtml(value);
+      : value === null ? "空值" : escapeHtml(value);
     return `<td class="${className}" title="${escapeHtml(value)}">${display}</td>`;
   }).join("")}</tr>`).join("");
   requestAnimationFrame(() => {
