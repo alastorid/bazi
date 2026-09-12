@@ -36,11 +36,16 @@ for(const date of metadata.supplementalDates){
 for(const date of SUPPLEMENTAL_DATES){
   if(scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "公曆日期"='${date.replaceAll("'","''")}'`)!==24)throw new Error(`required designated date must contain 24 charts: ${date}`);
 }
-const visualizationResults=window.BAZI_VISUALIZATION.buildOverviewQueries(metadata,"女＋男").map(rows);
+const visualizationPatternRules=rows('SELECT "名稱","吉凶" FROM "格局規則" WHERE "可計算"=1 AND "完整解釋"=1 AND "吉凶" IN (\'吉\',\'凶\') AND "結構稀有度" BETWEEN 1 AND 5 ORDER BY "名稱"');
+const visualizationResults=window.BAZI_VISUALIZATION.buildOverviewQueries(metadata,"女＋男",visualizationPatternRules).map(rows);
 if(visualizationResults[0].length!==3)throw new Error(`visualization extremes mismatch: ${visualizationResults[0].length}`);
 if(visualizationResults[1].length!==metadata.calendarYears.length*12)throw new Error(`visualization monthly statistics mismatch: ${visualizationResults[1].length}`);
 if(!visualizationResults[2].length||visualizationResults[2].length>10)throw new Error(`visualization best-week list mismatch: ${visualizationResults[2].length}`);
 if(visualizationResults.flat().some((row)=>row.目標日期&&!/^\d{4}-\d{2}-\d{2}$/.test(row.目標日期)))throw new Error("visualization statistic target date invalid");
+for(const extreme of visualizationResults[0]){
+  const detailCounts=rows(`SELECT COUNT(DISTINCT CASE WHEN "吉凶"='吉' THEN "名稱" END) AS good,COUNT(DISTINCT CASE WHEN "吉凶"='凶' THEN "名稱" END) AS bad FROM "命盤格局明細" WHERE "KEY"='${extreme.KEY.replaceAll("'","''")}' AND "結構稀有度" BETWEEN 1 AND 5`)[0];
+  if(extreme.吉格數!==detailCounts.good||extreme.凶格數!==detailCounts.bad)throw new Error(`visualization/detail count mismatch: ${extreme.KEY}`);
+}
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
 for(const name of ["命盤","星曜定義","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","關係格局規則","格局規則作用","命盤格局","命盤格局明細","命盤家庭評分","命盤家庭評分明細","命盤婚育時機"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
 if(objects.has("family_scores"))throw new Error("舊英文 family_scores view 不得保留");

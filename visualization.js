@@ -212,21 +212,25 @@
     scheduleDraw();
   }
 
-  function overviewSql(metadata, mode) {
+  const quoteIdentifier = (value) => `"${String(value).replaceAll('"', '""')}"`;
+
+  function overviewSql(metadata, mode, patternRules) {
     const years = metadata.calendarYears ?? metadata.years ?? [metadata.year];
     const firstDate = `${years[0]}-01-01`;
     const lastDate = `${years.at(-1)}-12-31`;
     const gender = mode === "女＋男" ? "1=1" : `m."性別"='${mode}'`;
+    const countExpression = (polarity) => patternRules.filter((rule) => rule.吉凶 === polarity)
+      .map((rule) => `COALESCE(g.${quoteIdentifier(rule.名稱)},0)`).join("+") || "0";
     return `WITH "單盤" AS (
       SELECT m."KEY",m."命盤連結",m."公曆日期",m."時辰",m."時辰序號",m."性別",
-        g."成格數" AS "吉格數",g."凶格數" AS "凶格數"
+        ${countExpression("吉")} AS "吉格數",${countExpression("凶")} AS "凶格數"
       FROM "命盤" m JOIN "命盤格局" g ON g."KEY"=m."KEY"
       WHERE m."公曆日期" BETWEEN '${firstDate}' AND '${lastDate}' AND ${gender}
     )`;
   }
 
-  function buildOverviewQueries(metadata, mode) {
-    const base = overviewSql(metadata, mode);
+  function buildOverviewQueries(metadata, mode, patternRules) {
+    const base = overviewSql(metadata, mode, patternRules);
     return [
       `${base}
         SELECT '最高吉格' AS "類別",* FROM "單盤" WHERE "KEY"=(SELECT "KEY" FROM "單盤" ORDER BY "吉格數" DESC,"凶格數","公曆日期","時辰序號","性別" LIMIT 1)
@@ -256,7 +260,10 @@
 
   async function fetchOverview() {
     if (state.overviewCache.has(state.mode)) return state.overviewCache.get(state.mode);
-    const [extremes, months, weeks] = await Promise.all(buildOverviewQueries(state.metadata, state.mode).map((sql) => state.query(sql)));
+    const patternResult = await state.query(`SELECT "名稱","吉凶" FROM "格局規則"
+      WHERE "可計算"=1 AND "完整解釋"=1 AND "吉凶" IN ('吉','凶') AND "結構稀有度" BETWEEN 1 AND 5
+      ORDER BY "名稱";`);
+    const [extremes, months, weeks] = await Promise.all(buildOverviewQueries(state.metadata, state.mode, patternResult.rows).map((sql) => state.query(sql)));
     const overview = { extremes: extremes.rows, months: months.rows, weeks: weeks.rows };
     state.overviewCache.set(state.mode, overview);
     return overview;
