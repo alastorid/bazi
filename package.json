@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "reuse-build": "node scripts/reuse-deployed-data.mjs",
     "generate": "node scripts/generate-data.mjs",
     "serve": "python3 -m http.server 8000 -d dist",
     "test": "node scripts/verify-data.mjs"

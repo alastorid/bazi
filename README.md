@@ -36,7 +36,7 @@ Serve `dist/` through an HTTP server. Do not open `index.html` directly because 
 
 Brightness is an input to the scoring engine rather than a display-only label. Only the 36-star evidence whitelist can enter raw columns, palace star lists, brightness data, scoring, queries, or autocomplete; the four transformations remain separate objects. The engine applies star-placement rules, four-transformation rules, then much stronger multi-dimensional combination/formation rules. Raw points are not clamped; the annual percentile assigns SSS–F. See [SCORING.md](SCORING.md) and the source boundary in [NIHAIXIA_SCORING.md](NIHAIXIA_SCORING.md).
 
-SQL Query and Visualization are separate outer tabs. The sample-query panel belongs only to SQL Query and disappears in Visualization. The visualization is a vertically scrolling 2026—2027 calendar timeline with twelve two-hour bands inside every date. Red means more inauspicious patterns, green means more auspicious patterns, and mixed counts naturally meet in yellow; stronger colors represent more matched patterns. A single 女／男／女＋男 switch controls the view, with male on the left and female on the right in the combined mode. Details stay on the right, and double-clicking a band opens its chart. The viewport canvas renders only visible months, while SQL data is fetched and cached in 31-day chunks.
+SQL Query and Visualization are separate outer tabs. The sample-query panel belongs only to SQL Query and disappears in Visualization. The visualization is a vertically scrolling 2026—2027 calendar timeline with twelve two-hour bands inside every date. Red means more inauspicious patterns, green means more auspicious patterns, and mixed counts naturally meet in yellow; stronger colors represent more matched patterns. A single 女／男／女＋男 switch controls the view, with male on the left and female on the right in the combined mode. When no chart is selected, the right pane shows clickable overall extremes, best weeks with auspicious-lean percentages and counts, and monthly statistics; each item navigates to its representative chart. Clicking calendar whitespace clears the selection and restores the overview. Double-clicking a band opens its chart. The viewport canvas renders only visible months, while SQL data is fetched and cached in 31-day chunks.
 
 ## Generate another year
 
@@ -55,7 +55,10 @@ Do not publish 1990—2030 as one browser database. The inclusive range contains
 The repository does not commit a precomputed database. On every deployment,
 GitHub Actions installs the pinned dependencies, runs `npm run build -- 2026-2027`,
 generates the database on the Actions runner, and publishes only `dist/`.
-The manual workflow accepts a different year input.
+The manual workflow accepts a different year input. UI-only deployments reuse the
+last runner-generated database only after checking its SHA-256 hash and rerunning
+all data/query verification; data-source, algorithm, dependency, or year changes
+still trigger a complete regeneration.
 
 ## Example SQL
 

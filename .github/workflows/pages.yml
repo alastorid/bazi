@@ -29,6 +29,8 @@ jobs:
       DATA_YEAR: ${{ inputs.year || '2026-2027' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -36,7 +38,11 @@ jobs:
       - name: Generate database and site
         run: |
           npm ci
-          npm run build -- "$DATA_YEAR"
+          if git diff --quiet HEAD^ HEAD -- src scripts/generate-data.mjs package-lock.json; then
+            npm run reuse-build -- "$DATA_YEAR" || npm run build -- "$DATA_YEAR"
+          else
+            npm run build -- "$DATA_YEAR"
+          fi
       - name: Upload database when verification fails
         if: failure()
         uses: actions/upload-artifact@v4
