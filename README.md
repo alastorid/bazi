@@ -4,7 +4,7 @@ Static GitHub Pages Web SQL terminal for querying every Zi Wei Dou Shu chart in 
 
 ## Dataset
 
-- 17,520 rows for 2026—2027: 730 days × 12 Chinese two-hour periods × 2 genders.
+- 17,568 rows: every day in 2026—2027 plus the two designated dates 1946-06-14 and 1991-12-19, each with 12 Chinese two-hour periods × 2 genders.
 - Primary key format: `YYYYMMDD-時辰-性別`, for example `20270810-子時-女`.
 - Every row has a direct `命盤連結` to its Metis Zi Wei chart.
 - One deliberately wide, first-normal-form SQLite table named `命盤`.
@@ -44,7 +44,11 @@ SQL Query and Visualization are separate outer tabs. The sample-query panel belo
 npm run build -- 2028
 ```
 
-No source or UI dates need editing. The site reads its year and date bounds from generated metadata.
+No source or UI dates need editing. The site reads its complete calendar years and supplemental dates from generated metadata. The permanent supplemental-date list lives in `src/dataset-config.mjs`; a date already covered by the requested range is automatically de-duplicated.
+
+### Large ranges
+
+Do not publish 1990—2030 as one browser database. The inclusive range contains about 359,400 charts (14,975 days × 24), roughly 20.5 times the 2026—2027 dataset. At the current density that would be approximately 1.1 GB compressed, plus several GB after browser decompression. Generate one database per year (or smaller date-range shards), publish a compact catalog, and load only the selected shard on demand. The 1946-06-14 date remains a small supplemental shard because it is outside 1990—2030.
 
 ## GitHub Pages
 

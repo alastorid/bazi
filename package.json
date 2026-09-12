@@ -2,7 +2,7 @@
   "name": "bazi",
   "version": "1.0.0",
   "private": true,
-  "description": "2026—2027 紫微斗數限定時間範圍反查資料庫與 Web SQL Terminal",
+  "description": "紫微斗數完整年度與指定日期反查資料庫及 Web SQL 終端",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",

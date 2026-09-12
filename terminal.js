@@ -272,7 +272,8 @@ async function boot() {
     const tableCount = Object.keys(state.metadata.tables ?? { [state.metadata.table]: state.metadata.columns }).length;
     el("#connectionState").textContent = `資料庫 · ${tableCount} 張資料表`;
     const yearLabel = Array.isArray(state.metadata.years) ? `${state.metadata.years[0]}—${state.metadata.years.at(-1)} 年` : `${state.metadata.year} 年`;
-    el("#datasetMeta").textContent = `${yearLabel} · ${state.metadata.rowCount.toLocaleString()} 筆 · ${state.metadata.columns.length} 欄`;
+    const supplementalLabel = state.metadata.supplementalDates?.length ? `＋${state.metadata.supplementalDates.length} 個指定日期` : "";
+    el("#datasetMeta").textContent = `${yearLabel}${supplementalLabel} · ${state.metadata.rowCount.toLocaleString()} 筆 · ${state.metadata.columns.length} 欄`;
     el("#runSql").disabled = false;
     await executeSql();
     await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });

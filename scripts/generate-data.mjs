@@ -14,6 +14,7 @@ import {
 } from "../src/scoring-model.mjs";
 import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
 import { scoreFamily } from "../src/scoring/family-scoring.mjs";
+import { SUPPLEMENTAL_DATES } from "../src/dataset-config.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const rangeInput = String(process.argv[2] || `${new Date().getFullYear() + 1}`);
@@ -45,7 +46,21 @@ function datesOfYear(targetYear) {
 
 const pad2 = (value) => String(value).padStart(2, "0");
 const quoteIdent = (value) => `"${String(value).replaceAll('"', '""')}"`;
-const dates = years.flatMap(datesOfYear);
+function parseIsoDate(value) {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw new Error(`Invalid supplemental date: ${value}`);
+  const [year, month, day] = match.slice(1).map(Number);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() + 1 !== month || check.getUTCDate() !== day) {
+    throw new Error(`Invalid supplemental date: ${value}`);
+  }
+  return { year, month, day };
+}
+const calendarDates = years.flatMap(datesOfYear);
+const calendarDateKeys = new Set(calendarDates.map(({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}`));
+const supplementalDates = [...new Set(SUPPLEMENTAL_DATES)].filter((date) => !calendarDateKeys.has(date)).sort();
+const dates = [...calendarDates, ...supplementalDates.map(parseIsoDate)].sort((a, b) =>
+  Date.UTC(a.year, a.month - 1, a.day) - Date.UTC(b.year, b.month - 1, b.day));
 const patternById = new Map(PATTERN_DEFINITIONS.map((item) => [item.id, item]));
 const brightnessRank = new Map(BRIGHTNESS_LEVELS);
 const evidenceLevelLabel = Object.freeze({ direct: "直接", group: "分組", combination: "組合" });
@@ -409,6 +424,9 @@ const metadata = {
   algorithm: "ziwei-doushu/lib/ziwei/algorithm.ts (iztro bySolar, zh-TW)",
   year: startYear === endYear ? startYear : rangeLabel,
   years,
+  calendarYears: years,
+  supplementalDates,
+  includedYears: [...new Set(dates.map((date) => date.year))].sort((a, b) => a - b),
   startYear,
   endYear,
   rowCount,
@@ -466,4 +484,4 @@ const metadata = {
   },
 };
 fs.writeFileSync(path.join(dataDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
-console.log(JSON.stringify({ years, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, transformRules: TRANSFORM_RULES.length, formationRules: FORMATION_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));
+console.log(JSON.stringify({ years, supplementalDates, rowCount, columns: columns.length, tables: Object.keys(metadata.tables).length, stars: stars.length, palaces: palaces.length, starRules: STAR_RULES.length, transformRules: TRANSFORM_RULES.length, formationRules: FORMATION_RULES.length, sqliteBytes: bytes.byteLength, gzipBytes: gzip.byteLength, hash }, null, 2));

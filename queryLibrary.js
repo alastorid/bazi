@@ -19,6 +19,17 @@ ORDER BY ${order};`;
   const definitions = [
     raw("rare_all", "overview", "全期稀有吉凶格", "預設查詢：同時列出吉格與凶格，結構稀有度高者優先。", detailSelect()),
     raw("chart_patterns", "overview", "單盤全部格局", "按日期、時辰與性別檢視每張命盤命中的全部吉凶格。", detailSelect({ order: `m."公曆日期", m."時辰序號", m."性別", d."吉凶", d."結構稀有度" DESC` })),
+    raw("supplemental_dates", "overview", "指定日期吉凶格", "查看 1946-06-14 與 1991-12-19 的全部男女時辰及其吉凶格。", `SELECT TOP 1000
+  m."KEY", m."命盤連結", m."公曆日期", m."時辰", m."性別",
+  SUM(CASE WHEN d."吉凶"='吉' THEN 1 ELSE 0 END) AS "吉格數",
+  SUM(CASE WHEN d."吉凶"='凶' THEN 1 ELSE 0 END) AS "凶格數",
+  GROUP_CONCAT(CASE WHEN d."吉凶"='吉' THEN d."名稱" END, '、') AS "吉格",
+  GROUP_CONCAT(CASE WHEN d."吉凶"='凶' THEN d."名稱" END, '、') AS "凶格"
+FROM "命盤" m LEFT JOIN "命盤格局明細" d ON d."KEY"=m."KEY"
+  AND d."吉凶" IN ('吉','凶') AND d."結構稀有度" BETWEEN 1 AND 5
+WHERE m."公曆日期" IN ('1946-06-14','1991-12-19')
+GROUP BY m."KEY", m."命盤連結", m."公曆日期", m."時辰", m."時辰序號", m."性別"
+ORDER BY m."公曆日期", m."時辰序號", m."性別";`),
     raw("good_rare", "good", "稀有吉格", "只列教材明確、可計算的吉格。", detailSelect({ where: `d."吉凶"='吉'`, order: `d."結構稀有度" DESC, m."公曆日期", m."時辰序號", m."性別"` })),
     raw("good_formal", "good", "正式吉格", "只看正式格局，不把一般組合混作格。", detailSelect({ where: `d."吉凶"='吉' AND d."類型"='正式格局'` })),
     raw("good_strong", "good", "吉性強組合", "科權祿、財官雙美、昌曲魁鉞等教材強組合。", detailSelect({ where: `d."吉凶"='吉' AND d."類型" IN ('強組合','條件組合')` })),

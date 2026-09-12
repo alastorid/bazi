@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { BRIGHTNESS_LEVELS, DIMENSIONS, DIMENSION_CONFIG, FORMATION_RULES, PATTERN_DEFINITIONS, RELATIONSHIP_PATTERN_DEFINITIONS } from "../src/scoring-model.mjs";
 import { FAMILY_CONFIG, FAMILY_PERCENTILE_COMPONENTS } from "../src/scoring/config.mjs";
 import { EXPLAINED_STAR_NAMES, UNEXPLAINED_STAR_NAMES } from "../src/explained-stars.mjs";
+import { SUPPLEMENTAL_DATES } from "../src/dataset-config.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const externalDataDir=process.env.BAZI_DATA_DIR ? path.resolve(process.env.BAZI_DATA_DIR) : null;
@@ -19,10 +20,20 @@ const scalar=(sql)=>rows(sql)[0]?.n??0;
 const count=rows('SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS keys FROM "命盤"')[0];
 if(count.n!==metadata.rowCount||count.keys!==metadata.rowCount)throw new Error(`row/key mismatch: ${JSON.stringify(count)}`);
 if(!Array.isArray(metadata.years)||metadata.years.length<1)throw new Error("year range metadata missing");
+if(JSON.stringify(metadata.calendarYears)!==JSON.stringify(metadata.years))throw new Error("calendar year metadata mismatch");
+if(!Array.isArray(metadata.supplementalDates))throw new Error("supplemental date metadata missing");
 const databaseYears=rows('SELECT DISTINCT "年" AS year FROM "命盤" ORDER BY "年"').map((row)=>row.year);
-if(JSON.stringify(databaseYears)!==JSON.stringify(metadata.years))throw new Error(`year range metadata mismatch: ${JSON.stringify(databaseYears)}`);
+const includedYears=[...new Set([...metadata.years,...metadata.supplementalDates.map((date)=>Number(date.slice(0,4)))])].sort((a,b)=>a-b);
+if(JSON.stringify(databaseYears)!==JSON.stringify(includedYears)||JSON.stringify(metadata.includedYears)!==JSON.stringify(includedYears))throw new Error(`included year metadata mismatch: ${JSON.stringify(databaseYears)}`);
 const expectedRangeRows=metadata.years.reduce((total,year)=>total+(new Date(Date.UTC(year+1,0,1))-new Date(Date.UTC(year,0,1)))/86400000*24,0);
-if(metadata.rowCount!==expectedRangeRows)throw new Error(`year range row mismatch: ${metadata.rowCount} versus ${expectedRangeRows}`);
+const expectedRows=expectedRangeRows+metadata.supplementalDates.length*24;
+if(metadata.rowCount!==expectedRows)throw new Error(`date coverage row mismatch: ${metadata.rowCount} versus ${expectedRows}`);
+for(const date of metadata.supplementalDates){
+  if(scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "公曆日期"='${date.replaceAll("'","''")}'`)!==24)throw new Error(`supplemental date must contain 24 charts: ${date}`);
+}
+for(const date of SUPPLEMENTAL_DATES){
+  if(scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "公曆日期"='${date.replaceAll("'","''")}'`)!==24)throw new Error(`required designated date must contain 24 charts: ${date}`);
+}
 const objects=new Set(rows("SELECT name FROM sqlite_master WHERE type IN ('table','view')").map((item)=>item.name));
 for(const name of ["命盤","星曜定義","星曜亮度","亮度等級","命盤評分","命盤評分明細","評分規則","評分維度","排名門檻","格局規則","關係格局規則","格局規則作用","命盤格局","命盤格局明細","命盤家庭評分","命盤家庭評分明細","命盤婚育時機"])if(!objects.has(name))throw new Error(`missing database object: ${name}`);
 if(objects.has("family_scores"))throw new Error("舊英文 family_scores view 不得保留");

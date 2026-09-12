@@ -22,7 +22,7 @@
   const localDate = (date = new Date()) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
   function shell() {
-    const years = state.metadata?.years ?? [state.metadata?.year];
+    const years = state.metadata?.calendarYears ?? state.metadata?.years ?? [state.metadata?.year];
     const range = years.length > 1 ? `${years[0]}—${years.at(-1)}` : `${years[0]}`;
     root().innerHTML = `<div class="viz-shell">
       <header class="viz-header">
@@ -54,7 +54,7 @@
 
   function prepareTimeline() {
     if (state.ready) return;
-    const years = state.metadata.years ?? [state.metadata.year];
+    const years = state.metadata.calendarYears ?? state.metadata.years ?? [state.metadata.year];
     const first = new Date(Date.UTC(Number(years[0]), 0, 1));
     const last = new Date(Date.UTC(Number(years.at(-1)), 11, 31));
     for (let date = first; date <= last; date = new Date(date.getTime() + 86400000)) state.dates.push(date.toISOString().slice(0, 10));
@@ -78,7 +78,7 @@
 
   function scrollToCurrentDate() {
     const now = new Date();
-    const years = state.metadata.years ?? [state.metadata.year];
+    const years = state.metadata.calendarYears ?? state.metadata.years ?? [state.metadata.year];
     const targetYear = years.includes(now.getFullYear()) ? now.getFullYear() : Number(years[0]);
     const targetMonth = targetYear === now.getFullYear() ? now.getMonth() : 0;
     const layout = state.months.find((item) => item.year === targetYear && item.month === targetMonth);
