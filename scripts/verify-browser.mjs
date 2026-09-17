@@ -11,6 +11,12 @@ try {
   await page.goto('http://127.0.0.1:8173/');
   await expect(page.locator('#browseRows tr').first()).toBeVisible({timeout:120000});
   await expect(page.locator('#browseRows tr')).toHaveCount(100);
+  await page.evaluate(async()=>{
+    for(const definition of window.BAZI_QUERY_LIBRARY.definitions){
+      const result=await call('query',{sql:definition.sql});
+      if(!result.rows.length)throw new Error('範例查詢沒有結果：'+definition.label);
+    }
+  });
   await page.locator('#addFilter').click();
   await page.locator('#fieldSearch').fill('性別');
   await page.locator('[data-field="性別"]').click();

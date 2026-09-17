@@ -62,7 +62,7 @@ The 1990—2030 inclusive range contains about 359,400 charts (14,975 days × 24
 The repository does not commit a precomputed database. On every deployment,
 GitHub Actions installs the pinned dependencies, runs `npm run build -- 2026-2027`,
 generates the database on the Actions runner, and publishes only `dist/`.
-The manual workflow accepts a different year input. Each deployment rebuilds and verifies its database on the runner; no production dataset is calculated locally or committed to Git.
+The manual workflow accepts a different year input and a `rebuild` switch for a full recalculation. UI-only deployments can reuse the runner-produced DuckDB only when its SHA-256 and source/converter fingerprints match; all sample SQL and browser workflows are retested. A one-time migration may reuse the exact hash-verified SQLite snapshot from Actions run 34675528189 only while its algorithm fingerprint matches. All conversions and full recalculations happen on the runner; no production dataset is calculated locally or committed to Git.
 
 ## Example SQL
 
