@@ -6,14 +6,18 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "reuse-build": "node scripts/reuse-deployed-data.mjs",
     "generate": "node scripts/generate-data.mjs",
     "serve": "python3 -m http.server 8000 -d dist",
     "test": "node scripts/verify-data.mjs"
   },
   "dependencies": {
+    "@duckdb/duckdb-wasm": "1.32.0",
     "iztro": "2.5.8",
     "lunar-javascript": "1.7.3",
     "sql.js": "1.13.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.1",
+    "esbuild": "0.25.10"
   }
 }

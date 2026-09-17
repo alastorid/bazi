@@ -229,9 +229,9 @@
     )`;
   }
 
-  function buildOverviewQueries(metadata, mode, patternRules) {
+  function buildOverviewQueries(metadata, mode, patternRules, dialect = 'duckdb') {
     const base = overviewSql(metadata, mode, patternRules);
-    return [
+    const queries = [
       `${base}
         SELECT '最高吉格' AS "類別",* FROM "單盤" WHERE "KEY"=(SELECT "KEY" FROM "單盤" ORDER BY "吉格數" DESC,"凶格數","公曆日期","時辰序號","性別" LIMIT 1)
         UNION ALL SELECT '最高凶格',* FROM "單盤" WHERE "KEY"=(SELECT "KEY" FROM "單盤" ORDER BY "凶格數" DESC,"吉格數","公曆日期","時辰序號","性別" LIMIT 1)
@@ -256,6 +256,12 @@
         ) SELECT * FROM "週統計" WHERE ("吉格數"+"凶格數")>0
           ORDER BY ("吉格數"-"凶格數") DESC,"偏吉百分比" DESC,("吉格數"+"凶格數") DESC LIMIT 10;`,
     ];
+    if (dialect === 'sqlite') return queries;
+    return queries.map(sql => sql
+      .replaceAll('MIN("吉格數","凶格數")', 'LEAST("吉格數","凶格數")')
+      .replaceAll(`strftime('%Y-%m',"公曆日期")`, `substr("公曆日期",1,7)`)
+      .replaceAll(`date("公曆日期",'-'||((CAST(strftime('%w',"公曆日期") AS INTEGER)+6)%7)||' days')`, `CAST(date_trunc('week',CAST("公曆日期" AS DATE)) AS VARCHAR)`)
+      .replaceAll(`date("週起始",'+6 days')`, `CAST(CAST("週起始" AS DATE)+6 AS VARCHAR)`));
   }
 
   async function fetchOverview() {

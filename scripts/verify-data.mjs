@@ -37,7 +37,7 @@ for(const date of SUPPLEMENTAL_DATES){
   if(scalar(`SELECT COUNT(*) AS n FROM "命盤" WHERE "公曆日期"='${date.replaceAll("'","''")}'`)!==24)throw new Error(`required designated date must contain 24 charts: ${date}`);
 }
 const visualizationPatternRules=rows('SELECT "名稱","吉凶" FROM "格局規則" WHERE "可計算"=1 AND "完整解釋"=1 AND "吉凶" IN (\'吉\',\'凶\') AND "結構稀有度" BETWEEN 1 AND 5 ORDER BY "名稱"');
-const visualizationResults=window.BAZI_VISUALIZATION.buildOverviewQueries(metadata,"女＋男",visualizationPatternRules).map(rows);
+const visualizationResults=window.BAZI_VISUALIZATION.buildOverviewQueries(metadata,"女＋男",visualizationPatternRules,'sqlite').map(rows);
 if(visualizationResults[0].length!==3)throw new Error(`visualization extremes mismatch: ${visualizationResults[0].length}`);
 if(visualizationResults[1].length!==metadata.calendarYears.length*12)throw new Error(`visualization monthly statistics mismatch: ${visualizationResults[1].length}`);
 if(!visualizationResults[2].length||visualizationResults[2].length>10)throw new Error(`visualization best-week list mismatch: ${visualizationResults[2].length}`);

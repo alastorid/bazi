@@ -1,7 +1,11 @@
 node_modules/
 data/*.sqlite
 data/*.sqlite.gz
+data/*.duckdb
+data/*.duckdb.gz
+data/duckdb-checks.json
 data/metadata.json
 vendor/sqljs/
 dist/
 .DS_Store
+test-results/

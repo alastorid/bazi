@@ -15,6 +15,7 @@ for (const [script, args] of [
   ["scripts/generate-data.mjs", [yearRange]],
   ["scripts/verify-data.mjs", []],
   ["scripts/verify-queries.mjs", []],
+  ["scripts/build-duckdb.mjs", []],
   ["scripts/prepare-pages.mjs", [yearRange]],
 ]) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...args], {

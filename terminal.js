@@ -6,7 +6,7 @@ const state = {
   activeQuery: null,
 };
 
-const worker = new Worker("sqlWorker.js?v=11");
+const worker = new Worker("duckWorker.js?v=1", {type:'module'});
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
@@ -27,6 +27,7 @@ function call(type, payload = {}) {
 worker.addEventListener("message", (event) => {
   if (event.data?.type === "status") {
     el("#statusText").textContent = event.data.message;
+    if (el('#browseLoadStatus')) el('#browseLoadStatus').textContent = event.data.message;
     return;
   }
   const request = pending.get(event.data.id);
@@ -101,13 +102,16 @@ function showResultTab(name) {
 function showWorkspace(name) {
   document.querySelectorAll(".workspace-tab").forEach((button) => button.classList.toggle("active", button.dataset.workspaceTab === name));
   el("#queryWorkspace").classList.toggle("active", name === "query");
+  el("#databaseWorkspace").classList.toggle("active", name === "database");
   el("#visualizationWorkspace").classList.toggle("active", name === "visualization");
   el(".app-body").classList.toggle("visualization-active", name === "visualization");
-  el("#runSql").hidden = name === "visualization";
+  el('.app-body').dataset.workspace = name;
+  el("#runSql").hidden = name !== "query";
   if (name === "visualization") window.BAZI_VISUALIZATION?.activate();
 }
 
 async function executeSql() {
+  if (!state.metadata || el('#runSql').disabled) return;
   const sql = el("#sqlEditor").value.trim();
   if (!sql) return;
   hideAutocomplete();
@@ -229,6 +233,13 @@ function exportCsv() {
 }
 
 function bindEvents() {
+  document.addEventListener('keydown', event => {
+    if (event.key === 'F5') { event.preventDefault(); if (el('.app-body').dataset.workspace === 'query') executeSql(); }
+  });
+  worker.addEventListener('error', event => {
+    for (const item of pending.values()) item.reject(new Error(event.message || '查詢引擎啟動失敗'));
+    pending.clear();
+  });
   el("#runSql").addEventListener("click", executeSql);
   el("#sqlEditor").addEventListener("keydown", handleEditorKeydown);
   el("#sqlEditor").addEventListener("input", () => { renderLineNumbers(); updateAutocomplete(); });
@@ -261,7 +272,7 @@ function bindEvents() {
 }
 
 async function boot() {
-  document.documentElement.classList.toggle("dark", localStorage.getItem("bazi.theme") !== "light");
+  document.documentElement.classList.toggle("dark", localStorage.getItem("bazi.theme") === "dark");
   state.activeQuery = DEFAULT_QUERY;
   el("#sqlEditor").value = SAMPLE_QUERIES[DEFAULT_QUERY];
   renderQueryLibrary();
@@ -275,10 +286,14 @@ async function boot() {
     const supplementalLabel = state.metadata.supplementalDates?.length ? `＋${state.metadata.supplementalDates.length} 個指定日期` : "";
     el("#datasetMeta").textContent = `${yearLabel}${supplementalLabel} · ${state.metadata.rowCount.toLocaleString()} 筆 · ${state.metadata.columns.length} 欄`;
     el("#runSql").disabled = false;
+    await window.BAZI_BROWSER.init({metadata:state.metadata, query:(sql,params)=>call('query',{sql,params}), openSql:sql=>{
+      el('#sqlEditor').value=sql; state.activeQuery=null; renderLineNumbers(); renderQueryLibrary(); showWorkspace('query'); executeSql();
+    }});
     await executeSql();
     await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });
   } catch (error) {
     el("#statusText").textContent = error.message;
+    if (el('#browseLoadStatus')) el('#browseLoadStatus').textContent = error.message;
     el("#messagesView").textContent = error.message;
     showResultTab("messages");
   }

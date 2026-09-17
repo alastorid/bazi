@@ -7,20 +7,23 @@
     <title>bazi</title>
     <link rel="stylesheet" href="terminal.css?v=12" />
     <link rel="stylesheet" href="visualization.css?v=5" />
+    <link rel="stylesheet" href="design.css?v=1" />
+    <script>document.documentElement.classList.toggle('dark',localStorage.getItem('bazi.theme')==='dark');</script>
   </head>
   <body>
     <header class="app-bar">
-      <strong>bazi</strong>
+      <a class="brand" href="./" aria-label="bazi 首頁"><span class="brand-mark">八</span><strong>bazi</strong></a>
       <nav class="workspace-tabs" aria-label="工作區">
-        <button class="workspace-tab active" data-workspace-tab="query" type="button">SQL 查詢</button>
-        <button class="workspace-tab" data-workspace-tab="visualization" type="button">可視化</button>
+        <button class="workspace-tab active" data-workspace-tab="database" type="button"><span>▦</span> 資料瀏覽</button>
+        <button class="workspace-tab" data-workspace-tab="query" type="button"><span>⌘</span> SQL 查詢</button>
+        <button class="workspace-tab" data-workspace-tab="visualization" type="button"><span>◫</span> 吉凶時間軸</button>
       </nav>
       <span id="connectionState">資料庫</span>
-      <button id="runSql" class="run-button" type="button" disabled>▶ 執行（F5）</button>
+      <button id="runSql" class="run-button" type="button" disabled hidden>▶ 執行 <kbd>F5</kbd></button>
       <button id="themeToggle" class="icon-button" type="button" title="切換主題">☾</button>
     </header>
 
-    <div class="app-body">
+    <div class="app-body" data-workspace="database">
       <aside class="object-explorer">
         <div class="explorer-title">範例查詢 <span id="queryCount"></span></div>
         <div class="query-search-wrap"><input id="querySearch" type="search" placeholder="搜尋查詢" autocomplete="off" /></div>
@@ -28,7 +31,10 @@
       </aside>
 
       <main class="workbench">
-      <section id="queryWorkspace" class="workspace-view query-workspace active">
+      <section id="databaseWorkspace" class="workspace-view database-workspace active">
+        <div class="browse-loading"><span class="loading-orbit"></span><h1>開啟命盤資料</h1><p id="browseLoadStatus">正在連線至資料庫…</p></div>
+      </section>
+      <section id="queryWorkspace" class="workspace-view query-workspace">
       <section class="query-pane">
         <div class="pane-tabs">
           <span class="pane-title">SQL</span>
@@ -74,7 +80,8 @@
     </footer>
 
     <script src="queryLibrary.js?v=12" defer></script>
-    <script src="visualization.js?v=6" defer></script>
-    <script src="terminal.js?v=18" defer></script>
+    <script src="visualization.js?v=7" defer></script>
+    <script src="browser.js?v=1" defer></script>
+    <script src="terminal.js?v=19" defer></script>
   </body>
 </html>
