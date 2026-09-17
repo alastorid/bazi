@@ -55,7 +55,7 @@ No source or UI dates need editing. The site reads its complete calendar years a
 
 ### Large ranges
 
-Do not publish 1990—2030 as one browser database. The inclusive range contains about 359,400 charts (14,975 days × 24), roughly 20.5 times the 2026—2027 dataset. At the current density that would be approximately 1.1 GB compressed, plus several GB after browser decompression. Generate one database per year (or smaller date-range shards), publish a compact catalog, and load only the selected shard on demand. The 1946-06-14 date remains a small supplemental shard because it is outside 1990—2030.
+The 1990—2030 inclusive range contains about 359,400 charts (14,975 days × 24), roughly 20.5 times the 2026—2027 dataset. The browser currently loads one whole DuckDB file, so benchmark its memory and transfer size before expanding to this range; old SQLite size estimates do not apply to DuckDB compression. Year-based shards or remote Parquet scans would allow larger ranges without loading every detail table at once. The 1946-06-14 date remains a designated extra date outside that range.
 
 ## GitHub Pages
 

@@ -18,6 +18,14 @@ try {
   await expect.poll(async()=>await page.locator('#browseRows td[data-column="性別"]').allTextContents()).toEqual(Array(100).fill('女'));
   await page.locator('#browseNext').click();
   await expect(page.locator('#browsePage')).toContainText('2 ／');
+  await page.locator('#addFilter').click();
+  await page.locator('#fieldSearch').fill('吉格數');
+  await page.locator('[data-field="吉格數"]').click();
+  await page.locator('[data-value]').fill('2');
+  await expect.poll(async()=>{
+    const values=await page.locator('#browseRows td[data-column="吉格數"]').allTextContents();
+    return values.length>0 && values.every(v=>Number(v)>=2);
+  }).toBe(true);
   await page.locator('#browseSql').click();
   await expect(page.locator('#queryWorkspace')).toBeVisible();
   await expect(page.locator('#queryState')).toHaveText('已執行',{timeout:30000});
@@ -38,10 +46,22 @@ try {
   await page.locator('[data-workspace-tab="database"]').click();
   await page.locator('#clearFilters').click();
   await expect(page.locator('#browseRows tr')).toHaveCount(100);
+  await expect.poll(()=>page.locator('#browseGrid').evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   fs.mkdirSync('test-results',{recursive:true});
   await page.screenshot({path:'test-results/database.png',fullPage:true});
   await page.locator('#themeToggle').click();
   await page.screenshot({path:'test-results/database-dark.png',fullPage:true});
+  await page.locator('#themeToggle').click();
+  await page.locator('[data-workspace-tab="visualization"]').click();
+  await page.screenshot({path:'test-results/calendar.png',fullPage:true});
+  await page.locator('[data-workspace-tab="query"]').click();
+  await page.locator('#sqlEditor').fill('SELECT TOP 1000 "KEY", "吉格數", "凶格數", "吉格", "凶格" FROM "命盤總覽" ORDER BY "吉格數" DESC');
+  await page.locator('#sqlEditor').press('F5');
+  await expect(page.locator('#gridRows tr')).toHaveCount(1000);
+  await page.screenshot({path:'test-results/sql.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-workspace-tab="database"]').click();
+  await page.screenshot({path:'test-results/mobile.png',fullPage:true});
   if(errors.length)throw new Error(errors.join('\n'));
   console.log('Browser verified: DuckDB load, filtering, pagination, SQL handoff, F5, errors, calendar, statistics, tab switching.');
 } finally {await browser.close();server.kill();}

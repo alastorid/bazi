@@ -41,7 +41,7 @@
     return terms.length?' WHERE '+terms.join(' AND '):'';
   }
   function sql(paged=false) {
-    const extra=columns().some(c=>c.name==='KEY')&&state.sort!=='KEY'?`, "KEY" ASC`:'';
+    const extra=['KEY','規則ID','維度','年齡','星曜'].filter(n=>n!==state.sort&&columns().some(c=>c.name===n)).map(n=>`, ${ident(n)} ASC`).join('');
     return `SELECT ${state.columns.map(ident).join(', ')}\nFROM ${ident(state.table)}${where()}${state.sort?`\nORDER BY ${ident(state.sort)} ${state.direction}${extra}`:''}${paged?`\nLIMIT ${state.size} OFFSET ${state.page*state.size}`:''}`;
   }
   function shell() {
@@ -120,6 +120,7 @@
       $('#browsePageInfo').textContent=state.count?`${number(state.page*state.size+1)}–${number(state.page*state.size+state.rows.length)} ／ ${number(state.count)} 筆`:'0 筆';
       $('#browsePage').textContent=`${state.page+1} ／ ${Math.max(1,Math.ceil(state.count/state.size))}`;
       $('#browsePrev').disabled=state.page===0;$('#browseNext').disabled=(state.page+1)*state.size>=state.count;
+      state.filters.filter(f=>f.expanded&&['in','notin'].includes(f.op)).forEach(f=>loadValues(f,$(`[data-value-search="${f.id}"]`)?.value??''));
     }catch(error){if(generation===state.generation){$('#browseState').textContent='查詢失敗：'+error.message;}}
     finally {if(generation===state.generation)$('#browseGrid').setAttribute('aria-busy','false');}
   }

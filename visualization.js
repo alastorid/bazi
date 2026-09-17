@@ -417,7 +417,7 @@
   window.BAZI_VISUALIZATION = {
     init,
     buildOverviewQueries,
-    activate() { requestAnimationFrame(() => { if (!state.positioned) scrollToCurrentDate(); scheduleDraw(); }); },
+    activate() { if (!state.ready) return; requestAnimationFrame(() => { if (!state.positioned) scrollToCurrentDate(); scheduleDraw(); }); },
     redraw: scheduleDraw,
   };
 })();

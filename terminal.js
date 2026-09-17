@@ -108,6 +108,7 @@ function showWorkspace(name) {
   el('.app-body').dataset.workspace = name;
   el("#runSql").hidden = name !== "query";
   if (name === "visualization") window.BAZI_VISUALIZATION?.activate();
+  if (name === 'query' && state.metadata && !state.result.columns.length) executeSql();
 }
 
 async function executeSql() {
@@ -233,6 +234,16 @@ function exportCsv() {
 }
 
 function bindEvents() {
+  const splitter=el('.splitter');
+  splitter.setAttribute('role','separator');splitter.setAttribute('aria-label','調整查詢與結果高度');splitter.setAttribute('aria-orientation','horizontal');splitter.tabIndex=0;
+  const resizePanes=y=>{
+    const pane=el('#queryWorkspace'),rect=pane.getBoundingClientRect();
+    const top=Math.max(140,Math.min(rect.height-194,y-rect.top));
+    pane.style.gridTemplateRows=`${top}px 14px minmax(180px,1fr)`;
+  };
+  splitter.addEventListener('pointerdown',event=>{splitter.setPointerCapture(event.pointerId);});
+  splitter.addEventListener('pointermove',event=>{if(splitter.hasPointerCapture(event.pointerId))resizePanes(event.clientY);});
+  splitter.addEventListener('keydown',event=>{if(['ArrowUp','ArrowDown'].includes(event.key)){event.preventDefault();resizePanes(splitter.getBoundingClientRect().top+(event.key==='ArrowDown'?20:-20));}});
   document.addEventListener('keydown', event => {
     if (event.key === 'F5') { event.preventDefault(); if (el('.app-body').dataset.workspace === 'query') executeSql(); }
   });
@@ -289,7 +300,7 @@ async function boot() {
     await window.BAZI_BROWSER.init({metadata:state.metadata, query:(sql,params)=>call('query',{sql,params}), openSql:sql=>{
       el('#sqlEditor').value=sql; state.activeQuery=null; renderLineNumbers(); renderQueryLibrary(); showWorkspace('query'); executeSql();
     }});
-    await executeSql();
+    if (el('.app-body').dataset.workspace === 'query') await executeSql();
     await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });
   } catch (error) {
     el("#statusText").textContent = error.message;
