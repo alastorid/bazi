@@ -9,3 +9,5 @@ vendor/sqljs/
 dist/
 .DS_Store
 test-results/
+shards/
+data/ranking-report.json

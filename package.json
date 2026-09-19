@@ -5,6 +5,7 @@
   "description": "紫微斗數完整年度與指定日期反查資料庫及 Web SQL 終端",
   "type": "module",
   "scripts": {
+    "shard": "node scripts/build-shard.mjs",
     "build": "node scripts/build.mjs",
     "generate": "node scripts/generate-data.mjs",
     "serve": "python3 -m http.server 8000 -d dist",

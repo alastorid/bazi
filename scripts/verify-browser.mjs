@@ -70,4 +70,10 @@ try {
   await page.screenshot({path:'test-results/mobile.png',fullPage:true});
   if(errors.length)throw new Error(errors.join('\n'));
   console.log('Browser verified: DuckDB load, filtering, pagination, SQL handoff, F5, errors, calendar, statistics, tab switching.');
+} catch(error) {
+  fs.mkdirSync('test-results',{recursive:true});
+  await page.screenshot({path:'test-results/failure.png',fullPage:true});
+  console.error('Browser errors:',errors);
+  console.error('Page text:',await page.locator('body').innerText());
+  throw error;
 } finally {await browser.close();server.kill();}

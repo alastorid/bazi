@@ -7,6 +7,7 @@ import sqlite3
 import sys
 import duckdb
 import pyarrow as pa
+from ranking_native import finalize_ranking
 
 root = Path(__file__).resolve().parent.parent
 meta_path = root / 'data/metadata.json'
@@ -54,6 +55,8 @@ meta['tables']['命盤總覽'] = meta['columns'] + [
 ]
 counts['命盤總覽'] = db.execute('SELECT COUNT(*) FROM "命盤總覽"').fetchone()[0]
 assert counts['命盤總覽'] == meta['rowCount']
+if '--shard' not in sys.argv:
+    finalize_ranking(db, meta, min(10000,meta['rowCount']))
 for item in json.loads(Path(sys.argv[1]).read_text()):
     result = db.execute(item['sql']).fetchall()
     assert result, f"Empty result: {item['name']}"

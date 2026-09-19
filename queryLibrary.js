@@ -3,7 +3,7 @@
 
   const GROUPS = [
     ["overview", "吉凶格總覽"], ["good", "吉格"], ["bad", "凶格"],
-    ["compare", "格局對照"], ["catalog", "規則目錄"],
+    ["compare", "格局對照"], ["ranking", "排名與比較"], ["catalog", "規則目錄"],
   ];
   const raw = (key, group, label, description, sql) => ({ key, group, label, description, sql });
   const detailSelect = ({ where = `d."吉凶" IN ('吉','凶')`, order = `d."結構稀有度" DESC, m."公曆日期", m."時辰序號", m."性別"` } = {}) => `SELECT TOP 1000
@@ -65,6 +65,24 @@ ORDER BY d."結構稀有度" DESC, "總次數", d."名稱";`),
 FROM "命盤" m JOIN "命盤格局明細" d ON d."KEY"=m."KEY"
 WHERE d."吉凶" IN ('吉','凶') AND d."結構稀有度" BETWEEN 1 AND 5
 GROUP BY m."年", m."月" ORDER BY m."年", m."月";`),
+    raw("subset_pr", "ranking", "月份子集排名", "月份可在範圍設定內修改；PR 為 0–100，較高者居前，並列共享名次。資料瀏覽也能將任何日期篩選轉成子集排名查詢。", `WITH "範圍" AS (
+  SELECT MIN("年") AS "年份",6 AS "月份" FROM (SELECT "年" FROM "命盤" GROUP BY "年" HAVING COUNT(DISTINCT "公曆日期")>=365)
+) SELECT
+  m."KEY", m."公曆日期", m."時辰", m."性別",
+  rk."總序" AS "全域總序", rk."百分位" AS "全域PR",
+  ROW_NUMBER() OVER (ORDER BY rk."總序") AS "當月序",
+  COUNT(*) OVER () AS "當月樣本",
+  CASE WHEN COUNT(*) OVER ()=1 THEN 100 ELSE ROUND(100.0*(1-(RANK() OVER (ORDER BY rk."排名序")-1.0)/(COUNT(*) OVER ()-1)),2) END AS "當月PR",
+  rk."加權分"
+FROM "命盤" m JOIN "命盤排名" rk ON rk."KEY"=m."KEY"
+WHERE m."年"=(SELECT "年份" FROM "範圍") AND m."月"=(SELECT "月份" FROM "範圍")
+ORDER BY rk."總序";`),
+    raw("ranking_peaks","ranking","頂端與底端命盤","最高與最低各五張命盤；可依識別碼追查逐宮與逐星依據。",`SELECT * FROM "排名峰值快照" ORDER BY "總序";`),
+    raw("ranking_distribution","ranking","年／月／性別分佈","各分組的全域PR分佈與前百分之一筆數。",`SELECT * FROM "排名分佈" ORDER BY "分組","群組";`),
+    raw("ranking_checks","ranking","分組驗證與覆核","分組均值只驗證模型訊號方向；需覆核的群組會完整保留。",`SELECT * FROM "排名驗證結論" ORDER BY "結論","分組","群組";`),
+    raw("ranking_sensitivity","ranking","權重敏感度","各宮權重正負百分之十時的排序相關與頂端重合率。",`SELECT * FROM "排名敏感度" ORDER BY "排序相關","宮位","權重變動";`),
+    raw("ranking_reference","ranking","參考盤穩定性","對五張不同參考盤驗證全部命盤的名次不變。",`SELECT * FROM "參考盤驗證";`),
+    raw("ranking_explanation","ranking","逐宮比較依據","頂端命盤相對參考盤的十二宮差值；逐星資料另存命盤比較星曜。",`SELECT d.* FROM "命盤對比明細" d JOIN "排名峰值快照" p ON d."KEY_A"=p."KEY" WHERE p."峰別"='頂端' ORDER BY p."總序",d."宮位";`),
     raw("pattern_catalog", "catalog", "格局規則目錄", "檢查格局類別、結構稀有度、證據完整度與是否可計算。", `SELECT TOP 1000
   "名稱", "類型", "嚴格度", "結構稀有度", "稀有度說明", "吉凶",
   "完整解釋", "可計算", "相關星曜", "成格條件", "教材結果"

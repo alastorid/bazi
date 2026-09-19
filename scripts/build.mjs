@@ -1,28 +1,17 @@
-import { spawnSync } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const yearRange = process.argv[2];
-
-if (!yearRange || !/^\d{4}(?:-\d{4})?$/.test(yearRange)) {
-  console.error("Usage: npm run build -- <year|start-end>\nExample: npm run build -- 2026-2027");
-  process.exit(2);
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const range=process.argv[2];
+if(!/^\d{4}(?:-\d{4})?$/.test(range??''))throw new Error('Usage: npm run build -- 2026-2035');
+const [start,end=start]=range.split('-').map(Number);
+if(start>end||start<1900||end>2200)throw new Error('Invalid range');
+const folder='shards/'+range;
+for(let year=start;year<=end;year++){
+  const step=spawnSync(process.execPath,['scripts/build-shard.mjs',String(year)],{stdio:'inherit'});
+  if(step.status!==0)process.exit(step.status??1);
+  const meta=JSON.parse(fs.readFileSync('data/metadata.json','utf8'));
+  fs.mkdirSync(folder+'/'+year,{recursive:true});
+  fs.copyFileSync(meta.duckdb,folder+'/'+year+'/'+meta.duckdb.split('/').at(-1));
+  fs.copyFileSync('data/metadata.json',folder+'/'+year+'/metadata.json');
 }
-
-for (const [script, args] of [
-  ["scripts/verify-scoring-model.mjs", []],
-  ["scripts/generate-data.mjs", [yearRange]],
-  ["scripts/verify-data.mjs", []],
-  ["scripts/verify-queries.mjs", []],
-  ["scripts/build-duckdb.mjs", []],
-  ["scripts/prepare-pages.mjs", [yearRange]],
-]) {
-  const result = spawnSync(process.execPath, [path.join(root, script), ...args], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
-
-console.log(`\n${yearRange} static site is ready in dist/`);
+const result=spawnSync(process.execPath,['scripts/finish-build.mjs',range,folder],{stdio:'inherit'});
+process.exit(result.status??1);

@@ -10,7 +10,7 @@
   const columns = () => metadata.tables[state.table];
   const numeric = name => columns().find(c=>c.name===name)?.type !== 'TEXT';
   const operators = {eq:'等於',ne:'不等於',contains:'包含',notcontains:'不包含',in:'屬於其中',notin:'不屬於其中',gt:'大於',gte:'大於或等於',lt:'小於',lte:'小於或等於',between:'介於',empty:'是空值',notempty:'不是空值'};
-  const defaultColumns = ['KEY','公曆日期','時辰','性別','吉格數','凶格數','最高稀有度','吉格','凶格','命宮主星','命盤連結'];
+  const defaultColumns = ['KEY','公曆日期','時辰','性別','全域PR','吉格數','凶格數','最高稀有度','吉格','凶格','命宮主星','命盤連結'];
   const fieldType = name => numeric(name) ? '數值' : '文字';
   function where(skipId) {
     const terms=[];
@@ -54,7 +54,7 @@
         <p class="rail-note">同時符合以下條件</p>
         <div id="filterList"></div>
         <button id="addFilter" class="add-filter">＋ 新增條件</button>
-        <div class="rail-bottom"><span id="schemaInfo"></span><button id="browseSql">⌘ 在 SQL 中開啟 <span>↗</span></button></div>
+        <div class="rail-bottom"><span id="schemaInfo"></span><button id="browseSubset">查看子集排名 ↗</button><button id="browseSql">⌘ 在 SQL 中開啟 <span>↗</span></button></div>
       </aside>
       <section class="browse-main">
         <header class="browse-heading"><div><div class="eyebrow">資料瀏覽</div><h1 id="browseTitle">命盤總覽 <span class="title-dot"></span></h1></div><div class="browse-actions"><button id="chooseColumns">▥ 欄位 <span id="visibleCount"></span></button><button id="browseExport">↓ 匯出</button></div></header>
@@ -69,6 +69,7 @@
     $('#clearFilters').onclick=()=>{state.filters=[];state.search='';state.page=0;$('#browseSearch').value='';renderFilters();refresh();};
     $('#chooseColumns').onclick=columnPicker;
     $('#browseSql').onclick=()=>openSql(sql(false)+';');
+    $('#browseSubset').onclick=()=>openSql(`SELECT "KEY","命盤連結","公曆日期","時辰","性別","全域PR",RANK() OVER(ORDER BY "全域名次") AS "子集名次",COUNT(*) OVER() AS "子集樣本",CASE WHEN COUNT(*) OVER()=1 THEN 100 ELSE ROUND(100.0*(1-(RANK() OVER(ORDER BY "全域名次")-1.0)/(COUNT(*) OVER()-1)),2) END AS "子集PR" FROM "命盤總覽"${where()} ORDER BY "全域名次","KEY";`);
     $('#browseExport').onclick=exportRows;
     $('#browseSearch').oninput=e=>{state.search=e.target.value;state.page=0;debounce();};
     $('#browseSize').onchange=e=>{state.size=Number(e.target.value);state.page=0;refresh();};
@@ -96,6 +97,7 @@
     state.sort=columns().some(c=>c.name==='公曆日期')?'公曆日期':columns()[0].name;state.direction='ASC';
     $('#browseSearch').value='';$('#browseTitle').textContent=state.table;
     $('#schemaInfo').textContent=`${number(columns().length)} 個可查詢欄位`;
+    $('#browseSubset').hidden=state.table!=='命盤總覽';
     renderFilters();
   }
   const debounce=()=>{clearTimeout(timer);timer=setTimeout(refresh,300);};
@@ -126,6 +128,7 @@
   }
   function cell(name,value) {
     if(value==null)return '<span class="empty-cell">—</span>';
+    if(name==='全域PR')return `<span class="pr-cell"><i style="width:${Math.max(0,Math.min(100,Number(value)))}%"></i><b>${Number(value).toFixed(1)}</b></span>`;
     if(name==='命盤連結'&&/^https:\/\/metisziwei\.com\/chart\?/.test(value))return `<a class="chart-link" href="${esc(value)}" target="_blank" rel="noopener noreferrer">開啟命盤 ↗</a>`;
     if(['吉格數','凶格數'].includes(name))return `<span class="count-badge ${name==='吉格數'?'good':'bad'} ${value?'':'zero'}">${esc(value)}</span>`;
     if(name==='最高稀有度'||name==='結構稀有度')return `<span class="rarity" title="結構稀有度 ${esc(value)}">${'✦'.repeat(Math.max(0,Math.min(5,Number(value))))}</span>`;

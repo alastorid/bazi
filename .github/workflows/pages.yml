@@ -1,70 +1,113 @@
 name: Deploy GitHub Pages
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       year:
-        description: Year to generate
+        description: Year range
         required: true
-        default: "2026-2027"
+        default: "2026-2035"
       rebuild:
-        description: Recalculate every chart
+        description: Recalculate cached years
         type: boolean
         default: false
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: true
-
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      years: ${{ steps.years.outputs.years }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: years
+        env:
+          DATA_YEAR: ${{ inputs.year || '2026-2035' }}
+        run: node scripts/year-matrix.mjs
+  generate:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        year: ${{ fromJSON(needs.plan.outputs.years) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/cache@v4
+        id: data
+        if: ${{ !inputs.rebuild }}
+        with:
+          path: |
+            data/*.duckdb.gz
+            data/metadata.json
+          key: bazi-year-${{ matrix.year }}-${{ hashFiles('src/**', 'scripts/generate-data.mjs', 'scripts/rank-bazi.mjs', 'scripts/build-duckdb*', 'scripts/data-fingerprint.mjs', 'package-lock.json') }}
+      - name: Generate and verify annual database
+        if: steps.data.outputs.cache-hit != 'true'
+        run: |
+          npm ci
+          python3 -m pip install duckdb==1.3.2 pyarrow==19.0.1
+          npm run shard -- ${{ matrix.year }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: year-${{ matrix.year }}
+          path: |
+            data/*.duckdb.gz
+            data/metadata.json
+          retention-days: 7
   deploy:
+    needs: generate
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     env:
-      DATA_YEAR: ${{ inputs.year || '2026-2027' }}
+      DATA_YEAR: ${{ inputs.year || '2026-2035' }}
+      MIN_SAMPLE: 10000
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - name: Generate database and site
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: year-*
+          path: shards
+      - name: Merge ten-year data and audit global ranks
         run: |
           npm ci
           python3 -m pip install duckdb==1.3.2 pyarrow==19.0.1
-          if [ "${{ inputs.rebuild }}" = "true" ]; then
-            npm run build -- "$DATA_YEAR"
-          else
-            node scripts/reuse-verified-data.mjs "$DATA_YEAR" || npm run build -- "$DATA_YEAR"
-          fi
+          node scripts/finish-build.mjs "$DATA_YEAR"
       - name: Verify browser workflows
         run: |
           npx playwright install --with-deps chromium
           node scripts/verify-browser.mjs
-      - name: Browser screenshots
+      - name: Browser screenshots and ranking audit
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-preview
-          path: test-results/
-      - name: Upload database when verification fails
+          path: |
+            test-results/
+            data/ranking-report.json
+      - name: Database diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: failed-build-${{ github.run_id }}
           path: data/
-          retention-days: 1
+          retention-days: 2
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
