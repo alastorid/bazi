@@ -53,6 +53,7 @@
     root().querySelector('.viz-measure').addEventListener('click',event=>{
       const measure=event.target.closest('[data-viz-measure]')?.dataset.vizMeasure;if(!measure||measure===state.measure)return;
       state.measure=measure;state.selected=null;
+      root().querySelector('#vizSummary').textContent=`${state.dates.length} 日 · 全庫 ${Number(state.metadata.rowCount).toLocaleString()} 張命盤 · ${measure==='rank'?'色彩依全域百分位':'色彩依吉凶格數量'}`;
       root().querySelectorAll('[data-viz-measure]').forEach(b=>b.classList.toggle('active',b.dataset.vizMeasure===measure));
       root().querySelector('.viz-scale').innerHTML=measure==='rank'?'<span>低PR</span><i></i><span>高PR</span>':'<span>凶格多</span><i></i><span>吉格多</span>';
       renderOverview();scheduleDraw();

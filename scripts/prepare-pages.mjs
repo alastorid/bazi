@@ -5,6 +5,7 @@ import { build } from 'esbuild';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const yearRange = process.argv[2];
+const dataDirectory = process.argv[3] ? path.resolve(process.argv[3]) : path.join(root, 'data');
 if (!yearRange || !/^\d{4}(?:-\d{4})?$/.test(yearRange)) throw new Error("year or year range required");
 
 const dist = path.join(root, "dist");
@@ -17,7 +18,7 @@ for (const file of ["index.html", "terminal.css", "design.css", "browser.js", "c
   fs.copyFileSync(path.join(root, file), path.join(dist, file));
 }
 for (const file of ["metadata.json", `ziwei-${yearRange}.duckdb.gz`]) {
-  fs.copyFileSync(path.join(root, "data", file), path.join(dist, "data", file));
+  fs.copyFileSync(path.join(dataDirectory, file), path.join(dist, "data", file));
 }
 for (const file of ["duckdb-browser-eh.worker.js", "duckdb-eh.wasm"]) {
   fs.copyFileSync(path.join(root, "node_modules", "@duckdb", "duckdb-wasm", "dist", file), path.join(dist, "vendor", "duckdb", file));

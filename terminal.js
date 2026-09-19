@@ -6,7 +6,7 @@ const state = {
   activeQuery: null,
 };
 
-const worker = new Worker("duckWorker.js?v=1", {type:'module'});
+const worker = new Worker("duckWorker.js?v=2", {type:'module'});
 const pending = new Map();
 let nextId = 1;
 const el = (selector) => document.querySelector(selector);
@@ -108,6 +108,7 @@ function showWorkspace(name) {
   el(".app-body").classList.toggle("visualization-active", name === "visualization");
   el('.app-body').dataset.workspace = name;
   el("#runSql").hidden = name !== "query";
+  if(name!=='query'&&state.metadata)el('#statusText').textContent=`${state.metadata.rowCount.toLocaleString()} 筆命盤已就緒`;
   if (name === "visualization") window.BAZI_VISUALIZATION?.activate();
   if (name === 'query' && state.metadata && !state.result.columns.length) executeSql();
 }

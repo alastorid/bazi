@@ -2,6 +2,18 @@ import * as duckdb from './vendor/duckdb/duckdb-bundle.js';
 import { translateTop } from './src/query-sql.mjs';
 let db, connection;
 const status = (message) => self.postMessage({type:'status',message});
+function scalar(value,type) {
+  // Arrow's 128-bit integers/decimals are typed arrays with a custom prototype.
+  // Convert before postMessage strips that prototype; retain large values exactly.
+  if(value?.[Symbol.for('isArrowBigNum')]) {
+    const raw=value.toString(),scale=type.scale??0;
+    const negative=raw.startsWith('-'),digits=raw.replace(/^-/, '').padStart(scale+1,'0');
+    const decimal=(negative?'-':'')+(scale?digits.slice(0,-scale)+'.'+digits.slice(-scale):digits);
+    return Number.isSafeInteger(Number(raw))?Number(decimal):decimal;
+  }
+  if(typeof value==='bigint')return value<=BigInt(Number.MAX_SAFE_INTEGER)&&value>=BigInt(Number.MIN_SAFE_INTEGER)?Number(value):value.toString();
+  return value;
+}
 async function init() {
   status('讀取資料規格…');
   const response = await fetch('data/metadata.json', {cache:'no-cache'});
@@ -35,10 +47,7 @@ async function query(sql, params=[]) {
     if (params.length) { statement = await connection.prepare(translateTop(sql)); result = await statement.query(...params); }
     else result = await connection.query(translateTop(sql));
     const columns = result.schema.fields.map(f=>f.name);
-    const rows = result.toArray().map(row=>Object.fromEntries(columns.map(name=>{
-      const value = row[name];
-      return [name,typeof value === 'bigint' ? (value <= BigInt(Number.MAX_SAFE_INTEGER) && value >= BigInt(Number.MIN_SAFE_INTEGER) ? Number(value) : value.toString()) : value];
-    })));
+    const rows = result.toArray().map(row=>Object.fromEntries(result.schema.fields.map(field=>[field.name,scalar(row[field.name],field.type)])));
     return {columns,rows,elapsedMs:Math.round(performance.now()-start)};
   } finally { if (statement) await statement.close(); }
 }

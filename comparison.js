@@ -7,7 +7,7 @@
   async function compare() {
     const a=$('#compareA').value.trim(),b=$('#compareB').value.trim();
     if(!a||!b)return;
-    const version=++generation;$('#compareState').textContent='讀取預算明細…';$('#compareRun').disabled=true;$('#compareResults').setAttribute('aria-busy','true');
+    const version=++generation;$('#compareState').textContent='讀取預算明細…';$('#compareRun').disabled=true;$('#compareResults').innerHTML='';$('#compareResults').setAttribute('aria-busy','true');
     try {
       const [charts,palaces,stars]=await Promise.all([
         query('SELECT m."KEY",m."命盤連結",m."公曆日期",m."時辰",m."性別",r."百分位",r."排名序",r."加權分" FROM "命盤" m JOIN "命盤排名" r USING("KEY") WHERE m."KEY" IN (?,?)',[a,b]),

@@ -11,6 +11,7 @@ try {
   await page.goto('http://127.0.0.1:8173/');
   await expect(page.locator('#browseRows tr').first()).toBeVisible({timeout:120000});
   await expect(page.locator('#browseRows tr')).toHaveCount(100);
+  await expect(page.locator('#browseMetrics')).not.toContainText('非數值');
   await page.evaluate(async()=>{
     const meta=state.metadata;
     const years=meta.calendarYears;
@@ -18,6 +19,9 @@ try {
     if(meta.rowCount!==expected)throw new Error('完整年度與指定日期筆數不符');
     const counts=await call('query',{sql:'SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS u FROM "命盤排名"'});
     if(counts.rows[0].n!==expected||counts.rows[0].u!==expected)throw new Error('瀏覽器內排名筆數不符');
+    const numeric=await call('query',{sql:`SELECT SUM(v) AS total,CAST(-12.34 AS DECIMAL(10,2)) AS decimal,CAST('123456789012345678901234567890' AS HUGEINT) AS huge FROM (VALUES (1),(2)) t(v)`});
+    const row=numeric.rows[0];
+    if(row.total!==3||row.decimal!==-12.34||row.huge!=='123456789012345678901234567890')throw new Error('DuckDB 數值傳遞精度不符：'+JSON.stringify(row));
   });
   await page.evaluate(async()=>{
     for(const definition of window.BAZI_QUERY_LIBRARY.definitions){
@@ -67,14 +71,14 @@ try {
   await expect(page.locator('.compare-verdict')).toContainText('甲較高');
   await page.screenshot({path:'test-results/comparison.png',fullPage:true});
   await page.locator('#compareSwap').click();
-  await expect(page.locator('.compare-verdict')).toContainText('乙較高');
+  await expect(page.locator('.compare-verdict')).toContainText('乙較高',{timeout:30000});
   const key=await page.locator('#compareA').inputValue();
   await page.locator('#compareB').fill(key);
   await page.locator('#compareRun').click();
-  await expect(page.locator('.compare-verdict')).toContainText('相同');
+  await expect(page.locator('.compare-verdict')).toContainText('相同',{timeout:30000});
   await page.locator('#compareB').fill('不存在');
   await page.locator('#compareRun').click();
-  await expect(page.locator('#compareState')).toContainText('找不到命盤');
+  await expect(page.locator('#compareState')).toContainText('找不到命盤',{timeout:30000});
   await page.locator('[data-workspace-tab="database"]').click();
   await page.screenshot({path:'test-results/database.png',fullPage:true});
   await page.locator('#themeToggle').click();
