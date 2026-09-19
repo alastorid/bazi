@@ -4,7 +4,7 @@ GitHub Pages workspace with a filterable database browser, SQL terminal, calenda
 
 ## Dataset
 
-- Target: 87,696 rows, every day in 2026—2035 plus the two designated dates 1946-06-14 and 1991-12-19, each with 12 Chinese two-hour periods × 2 genders.
+- 87,696 verified rows, every day in 2026—2035 plus the two designated dates 1946-06-14 and 1991-12-19, each with 12 Chinese two-hour periods × 2 genders. Native DuckDB: 188.01 MiB, gzip: 39.21 MiB.
 - Primary key format: `YYYYMMDD-時辰-性別`, for example `20270810-子時-女`.
 - Every row has a direct `命盤連結` to its Metis Zi Wei chart.
 - One deliberately wide, first-normal-form DuckDB table named `命盤` and a `命盤總覽` view with good/bad pattern counts, names, and maximum structural rarity.
