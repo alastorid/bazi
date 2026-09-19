@@ -14,7 +14,7 @@
     metadata: null, query: null, dates: [], months: [], byCell: new Map(),
     loadedChunks: new Set(), loadingChunks: new Set(), mode: "女＋男",
     chunkPromises: new Map(), overviewCache: new Map(), selected: null,
-    ready: false, positioned: false, frame: 0,
+    ready: false, positioned: false, frame: 0, measure:'patterns', rankCache:new Map(),
   };
   const root = () => document.querySelector("#visualizationView");
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
@@ -28,6 +28,7 @@
     root().innerHTML = `<div class="viz-shell">
       <header class="viz-header">
         <div><strong>${esc(range)} 吉凶格時間軸</strong><span id="vizSummary">準備時間軸…</span></div>
+        <div class="viz-measure" role="group" aria-label="時間軸內容"><button data-viz-measure="patterns" class="active">吉凶格</button><button data-viz-measure="rank">排名百分位</button></div>
         <div class="viz-switch" role="group" aria-label="性別顯示">
           ${["女", "男", "女＋男"].map((mode) => `<button type="button" data-viz-mode="${mode}" class="${mode === state.mode ? "active" : ""}">${mode}</button>`).join("")}
         </div>
@@ -49,6 +50,13 @@
     scroller.addEventListener("click", choose);
     scroller.addEventListener("dblclick", openChart);
     root().querySelector(".viz-switch").addEventListener("click", switchMode);
+    root().querySelector('.viz-measure').addEventListener('click',event=>{
+      const measure=event.target.closest('[data-viz-measure]')?.dataset.vizMeasure;if(!measure||measure===state.measure)return;
+      state.measure=measure;state.selected=null;
+      root().querySelectorAll('[data-viz-measure]').forEach(b=>b.classList.toggle('active',b.dataset.vizMeasure===measure));
+      root().querySelector('.viz-scale').innerHTML=measure==='rank'?'<span>低PR</span><i></i><span>高PR</span>':'<span>凶格多</span><i></i><span>吉格多</span>';
+      renderOverview();scheduleDraw();
+    });
     root().querySelector(".viz-detail").addEventListener("click", followStatistic);
     new ResizeObserver(scheduleDraw).observe(scroller);
     prepareTimeline();
@@ -104,18 +112,7 @@
       const start = chunk * CHUNK_DAYS;
       const end = Math.min(state.dates.length - 1, start + CHUNK_DAYS - 1);
       try {
-        const result = await state.query(`SELECT
-          m."KEY", m."命盤連結", m."公曆日期", m."時辰", m."時辰序號", m."性別",
-          COUNT(DISTINCT CASE WHEN d."吉凶"='吉' THEN d."名稱" END) AS "吉格數",
-          COUNT(DISTINCT CASE WHEN d."吉凶"='凶' THEN d."名稱" END) AS "凶格數",
-          GROUP_CONCAT(DISTINCT CASE WHEN d."吉凶"='吉' THEN d."名稱" END) AS "吉格",
-          GROUP_CONCAT(DISTINCT CASE WHEN d."吉凶"='凶' THEN d."名稱" END) AS "凶格"
-        FROM "命盤" m
-        LEFT JOIN "命盤格局明細" d ON d."KEY"=m."KEY"
-          AND d."吉凶" IN ('吉','凶') AND d."結構稀有度" BETWEEN 1 AND 5
-        WHERE m."公曆日期" BETWEEN '${state.dates[start]}' AND '${state.dates[end]}'
-        GROUP BY m."KEY", m."命盤連結", m."公曆日期", m."時辰", m."時辰序號", m."性別"
-        ORDER BY m."公曆日期", m."時辰序號", m."性別";`);
+        const result = await state.query(`SELECT "KEY","命盤連結","公曆日期","時辰","時辰序號","性別","吉格數","凶格數","吉格","凶格","全域PR","全域名次" FROM "命盤總覽" WHERE "公曆日期" BETWEEN '${state.dates[start]}' AND '${state.dates[end]}' ORDER BY "公曆日期","時辰序號","性別";`);
         for (const row of result.rows) state.byCell.set(key(row.公曆日期, Number(row.時辰序號), row.性別), row);
         state.loadedChunks.add(chunk);
         root().querySelector(".viz-loading")?.remove();
@@ -185,7 +182,7 @@
     tooltip.hidden = false;
     tooltip.style.left = `${Math.min(window.innerWidth - 310, event.clientX + 12)}px`;
     tooltip.style.top = `${Math.min(window.innerHeight - 110, event.clientY + 12)}px`;
-    tooltip.textContent = `${row.公曆日期} · ${row.時辰} · ${row.性別}\n吉格 ${row.吉格數}：${String(row.吉格 || "無").replaceAll(",", "、")}\n凶格 ${row.凶格數}：${String(row.凶格 || "無").replaceAll(",", "、")}`;
+    tooltip.textContent = `${row.公曆日期} · ${row.時辰} · ${row.性別} · 全域PR ${Number(row.全域PR).toFixed(2)}\n吉格 ${row.吉格數}：${String(row.吉格 || "無").replaceAll(",", "、")}\n凶格 ${row.凶格數}：${String(row.凶格 || "無").replaceAll(",", "、")}`;
   }
 
   function choose(event) {
@@ -199,10 +196,12 @@
 
   function renderChartDetail(row) {
     root().querySelector(".viz-detail").innerHTML = `<div class="viz-detail-heading"><span>${esc(row.性別)}命</span><strong>${esc(row.公曆日期)}</strong><b>${esc(row.時辰)}</b><small>${esc(row.KEY)}</small></div>
+      <div class="viz-pr-detail"><strong>${Number(row.全域PR).toFixed(2)}</strong><span>全域PR · 第 ${Number(row.全域名次).toLocaleString()} 名</span><button id="compareSelected">加入命盤比較 ↗</button></div>
       <div class="viz-detail-group good"><header><b>吉格</b><em>${Number(row.吉格數)} 格</em></header><p>${esc(String(row.吉格 || "無").replaceAll(",", "、"))}</p></div>
       <div class="viz-detail-group bad"><header><b>凶格</b><em>${Number(row.凶格數)} 格</em></header><p>${esc(String(row.凶格 || "無").replaceAll(",", "、"))}</p></div>
       <a class="viz-chart-link" href="${esc(row.命盤連結)}" target="_blank" rel="noopener noreferrer">開啟命盤 ↗</a>
       <small class="viz-double-hint">也可雙擊月曆中的色塊直接開啟</small>`;
+    root().querySelector('#compareSelected').onclick=()=>window.BAZI_COMPARISON?.open(row.KEY);
   }
 
   function clearSelection() {
@@ -281,11 +280,12 @@
   async function renderOverview() {
     const detail = root()?.querySelector(".viz-detail");
     if (!detail || state.selected) return;
+    if(state.measure==='rank')return renderRankOverview(detail);
     const requestedMode = state.mode;
     detail.innerHTML = '<div class="viz-overview-loading"><strong>全期格局統計</strong><span>統計計算中…</span></div>';
     try {
       const overview = await fetchOverview();
-      if (state.selected || state.mode !== requestedMode || !root()?.querySelector(".viz-detail")) return;
+      if (state.selected || state.mode !== requestedMode || state.measure!=='patterns' || !root()?.querySelector(".viz-detail")) return;
       const mode = state.mode === "女＋男" ? "男女合計" : `${state.mode}命`;
       detail.innerHTML = `<div class="viz-overview-heading"><strong>全期格局統計</strong><span>${mode} · 點選項目定位</span></div>
         <section class="viz-stat-section"><h3>全期極值</h3><div class="viz-extremes">${overview.extremes.map((row) => `<button type="button" class="viz-stat-link" ${targetAttributes(row)}><b>${esc(row.類別)}</b><span>${esc(row.公曆日期)} · ${esc(row.時辰)} · ${esc(row.性別)}</span><em>${counts(row)}</em></button>`).join("")}</div></section>
@@ -294,6 +294,25 @@
     } catch (error) {
       detail.innerHTML = `<div class="viz-overview-loading"><strong>全期格局統計</strong><span>統計載入失敗：${esc(error.message)}</span></div>`;
     }
+  }
+
+  async function renderRankOverview(detail) {
+    const mode=state.mode;
+    detail.innerHTML='<div class="viz-overview-loading"><strong>排名統計</strong><span>讀取全期與月份分佈…</span></div>';
+    try{
+      if(!state.rankCache.has(mode)){
+        const years=state.metadata.calendarYears;const where=`"年" BETWEEN ${years[0]} AND ${years.at(-1)}${mode==='女＋男'?'':` AND "性別"='${mode}'`}`;
+        const base=`SELECT * FROM "命盤總覽" WHERE ${where}`;
+        const results=await Promise.all([
+          state.query(`${base} ORDER BY "全域PR" DESC,"KEY" LIMIT 5`),state.query(`${base} ORDER BY "全域PR","KEY" LIMIT 5`),
+          state.query(`WITH r AS (SELECT *,substr("公曆日期",1,7) AS "年月",ROW_NUMBER() OVER(PARTITION BY substr("公曆日期",1,7) ORDER BY "全域PR" DESC,"KEY") AS n FROM "命盤總覽" WHERE ${where}) SELECT "年月",COUNT(*) AS "樣本數",AVG("全域PR") AS "平均PR",MIN("全域PR") AS "最低PR",MAX("全域PR") AS "最高PR",MAX(CASE WHEN n=1 THEN "公曆日期" END) AS "目標日期",MAX(CASE WHEN n=1 THEN "時辰序號" END) AS "目標時辰序號",MAX(CASE WHEN n=1 THEN "性別" END) AS "目標性別" FROM r GROUP BY "年月" ORDER BY "年月"`),
+        ]);state.rankCache.set(mode,results.map(r=>r.rows));
+      }
+      if(state.mode!==mode||state.measure!=='rank'||state.selected)return;
+      const [top,bottom,months]=state.rankCache.get(mode);
+      const list=(rows,title)=>`<section class="viz-stat-section"><h3>${title}</h3>${rows.map(r=>`<button class="viz-stat-link" ${targetAttributes(r)}><b>PR ${Number(r.全域PR).toFixed(2)}</b><span>${esc(r.公曆日期)} · ${esc(r.時辰)} · ${esc(r.性別)}</span><em>${counts(r)}</em></button>`).join('')}</section>`;
+      detail.innerHTML=`<div class="viz-overview-heading"><strong>排名統計</strong><span>${mode} · PR 為全資料範圍相對名次</span></div>${list(top,'頂端五張')}${list(bottom,'底端五張')}<section class="viz-stat-section"><h3>月份分佈</h3>${months.map(r=>`<button class="viz-stat-link" ${targetAttributes(r)}><b>${esc(r.年月)}</b><span>平均 ${Number(r.平均PR).toFixed(1)} · ${r.樣本數} 張</span><em>${Number(r.最低PR).toFixed(1)}—${Number(r.最高PR).toFixed(1)}</em></button>`).join('')}</section>`;
+    }catch(error){if(state.measure==='rank')detail.textContent='排名統計載入失敗：'+error.message;}
   }
 
   async function followStatistic(event) {
@@ -340,7 +359,7 @@
 
   function drawBand(context, row, x, y, width, height) {
     if (!row) { context.fillStyle = "rgba(127,127,127,.055)"; context.fillRect(x, y, width, height); return; }
-    context.fillStyle = color(Number(row.吉格數), Number(row.凶格數));
+    context.fillStyle = state.measure==='rank'?`hsl(${Math.round(Number(row.全域PR)*1.2)} 60% 60%)`:color(Number(row.吉格數), Number(row.凶格數));
     context.fillRect(x, y, width, height);
     if (state.selected?.KEY === row.KEY) {
       context.strokeStyle = "#fff"; context.lineWidth = 1.5; context.strokeRect(x + .75, y + .75, width - 1.5, height - 1.5);

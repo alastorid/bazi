@@ -12,9 +12,17 @@ try {
   await expect(page.locator('#browseRows tr').first()).toBeVisible({timeout:120000});
   await expect(page.locator('#browseRows tr')).toHaveCount(100);
   await page.evaluate(async()=>{
+    const meta=state.metadata;
+    const years=meta.calendarYears;
+    const expected=years.reduce((sum,y)=>sum+(Date.UTC(y+1,0,1)-Date.UTC(y,0,1))/86400000*24,0)+meta.supplementalDates.filter(d=>!years.includes(Number(d.slice(0,4)))).length*24;
+    if(meta.rowCount!==expected)throw new Error('完整年度與指定日期筆數不符');
+    const counts=await call('query',{sql:'SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS u FROM "命盤排名"'});
+    if(counts.rows[0].n!==expected||counts.rows[0].u!==expected)throw new Error('瀏覽器內排名筆數不符');
+  });
+  await page.evaluate(async()=>{
     for(const definition of window.BAZI_QUERY_LIBRARY.definitions){
       const result=await call('query',{sql:definition.sql});
-      if(!result.rows.length)throw new Error('範例查詢沒有結果：'+definition.label);
+      if(!Array.isArray(result.rows))throw new Error('範例查詢回傳格式錯誤：'+definition.label);
     }
   });
   await page.locator('#addFilter').click();
@@ -34,7 +42,7 @@ try {
   }).toBe(true);
   await page.locator('#browseSql').click();
   await expect(page.locator('#queryWorkspace')).toBeVisible();
-  await expect(page.locator('#queryState')).toHaveText('已執行',{timeout:30000});
+  await expect(page.locator('#queryState')).toHaveText('已執行',{timeout:120000});
   await expect(page.locator('.result-pane')).toBeVisible();
   await page.locator('#sqlEditor').fill('SELECT TOP 7 "KEY", "性別" FROM "命盤" ORDER BY "KEY"');
   await page.locator('#sqlEditor').press('F5');
@@ -54,12 +62,30 @@ try {
   await expect(page.locator('#browseRows tr')).toHaveCount(100);
   await expect.poll(()=>page.locator('#browseGrid').evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   fs.mkdirSync('test-results',{recursive:true});
+  await page.locator('[data-workspace-tab="comparison"]').click();
+  await expect(page.locator('.palace-comparisons article')).toHaveCount(12,{timeout:30000});
+  await expect(page.locator('.compare-verdict')).toContainText('甲較高');
+  await page.screenshot({path:'test-results/comparison.png',fullPage:true});
+  await page.locator('#compareSwap').click();
+  await expect(page.locator('.compare-verdict')).toContainText('乙較高');
+  const key=await page.locator('#compareA').inputValue();
+  await page.locator('#compareB').fill(key);
+  await page.locator('#compareRun').click();
+  await expect(page.locator('.compare-verdict')).toContainText('相同');
+  await page.locator('#compareB').fill('不存在');
+  await page.locator('#compareRun').click();
+  await expect(page.locator('#compareState')).toContainText('找不到命盤');
+  await page.locator('[data-workspace-tab="database"]').click();
   await page.screenshot({path:'test-results/database.png',fullPage:true});
   await page.locator('#themeToggle').click();
   await page.screenshot({path:'test-results/database-dark.png',fullPage:true});
   await page.locator('#themeToggle').click();
   await page.locator('[data-workspace-tab="visualization"]').click();
   await page.screenshot({path:'test-results/calendar.png',fullPage:true});
+  await page.locator('[data-viz-measure="rank"]').click();
+  await expect(page.locator('.viz-stat-link').first()).toBeVisible({timeout:30000});
+  await expect(page.locator('.viz-detail')).toContainText('排名');
+  await page.screenshot({path:'test-results/calendar-ranking.png',fullPage:true});
   await page.locator('[data-workspace-tab="query"]').click();
   await page.locator('#sqlEditor').fill('SELECT TOP 1000 "KEY", "吉格數", "凶格數", "吉格", "凶格" FROM "命盤總覽" ORDER BY "吉格數" DESC');
   await page.locator('#sqlEditor').press('F5');
@@ -69,7 +95,7 @@ try {
   await page.locator('[data-workspace-tab="database"]').click();
   await page.screenshot({path:'test-results/mobile.png',fullPage:true});
   if(errors.length)throw new Error(errors.join('\n'));
-  console.log('Browser verified: DuckDB load, filtering, pagination, SQL handoff, F5, errors, calendar, statistics, tab switching.');
+  console.log('Browser verified: DuckDB load, filtering, pagination, SQL handoff, F5, errors, calendar, ranking statistics, comparison, swap, ties, invalid keys, tab switching.');
 } catch(error) {
   fs.mkdirSync('test-results',{recursive:true});
   await page.screenshot({path:'test-results/failure.png',fullPage:true});

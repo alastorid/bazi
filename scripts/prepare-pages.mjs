@@ -13,7 +13,7 @@ fs.mkdirSync(path.join(dist, "data"), { recursive: true });
 fs.mkdirSync(path.join(dist, "vendor", "duckdb"), { recursive: true });
 fs.mkdirSync(path.join(dist, "src"), { recursive: true });
 
-for (const file of ["index.html", "terminal.css", "design.css", "browser.js", "visualization.css", "terminal.js", "visualization.js", "queryLibrary.js", "duckWorker.js", "src/query-sql.mjs", ".nojekyll"]) {
+for (const file of ["index.html", "terminal.css", "design.css", "browser.js", "comparison.js", "visualization.css", "terminal.js", "visualization.js", "queryLibrary.js", "duckWorker.js", "src/query-sql.mjs", ".nojekyll"]) {
   fs.copyFileSync(path.join(root, file), path.join(dist, file));
 }
 for (const file of ["metadata.json", `ziwei-${yearRange}.duckdb.gz`]) {

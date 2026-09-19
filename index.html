@@ -7,7 +7,7 @@
     <title>bazi</title>
     <link rel="stylesheet" href="terminal.css?v=12" />
     <link rel="stylesheet" href="visualization.css?v=5" />
-    <link rel="stylesheet" href="design.css?v=1" />
+    <link rel="stylesheet" href="design.css?v=2" />
     <script>document.documentElement.classList.toggle('dark',localStorage.getItem('bazi.theme')==='dark');</script>
   </head>
   <body>
@@ -17,6 +17,7 @@
         <button class="workspace-tab active" data-workspace-tab="database" type="button"><span>▦</span> 資料瀏覽</button>
         <button class="workspace-tab" data-workspace-tab="query" type="button"><span>⌘</span> SQL 查詢</button>
         <button class="workspace-tab" data-workspace-tab="visualization" type="button"><span>◫</span> 吉凶時間軸</button>
+        <button class="workspace-tab" data-workspace-tab="comparison" type="button"><span>⇄</span> 命盤比較</button>
       </nav>
       <span id="connectionState">資料庫</span>
       <button id="runSql" class="run-button" type="button" disabled hidden>▶ 執行 <kbd>F5</kbd></button>
@@ -71,6 +72,7 @@
       <section id="visualizationWorkspace" class="workspace-view visualization-workspace">
         <div id="visualizationView" class="visualization-view"></div>
       </section>
+      <section id="comparisonWorkspace" class="workspace-view"></section>
       </main>
     </div>
 
@@ -79,9 +81,10 @@
       <span id="datasetMeta"></span>
     </footer>
 
-    <script src="queryLibrary.js?v=12" defer></script>
-    <script src="visualization.js?v=8" defer></script>
-    <script src="browser.js?v=2" defer></script>
-    <script src="terminal.js?v=20" defer></script>
+    <script src="queryLibrary.js?v=13" defer></script>
+    <script src="visualization.js?v=9" defer></script>
+    <script src="browser.js?v=3" defer></script>
+    <script src="comparison.js?v=1" defer></script>
+    <script src="terminal.js?v=21" defer></script>
   </body>
 </html>

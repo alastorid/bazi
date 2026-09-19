@@ -104,6 +104,7 @@ function showWorkspace(name) {
   el("#queryWorkspace").classList.toggle("active", name === "query");
   el("#databaseWorkspace").classList.toggle("active", name === "database");
   el("#visualizationWorkspace").classList.toggle("active", name === "visualization");
+  el('#comparisonWorkspace').classList.toggle('active',name==='comparison');
   el(".app-body").classList.toggle("visualization-active", name === "visualization");
   el('.app-body').dataset.workspace = name;
   el("#runSql").hidden = name !== "query";
@@ -302,6 +303,7 @@ async function boot() {
     }});
     if (el('.app-body').dataset.workspace === 'query') await executeSql();
     await window.BAZI_VISUALIZATION?.init({ metadata: state.metadata, query: (sql) => call("query", { sql }) });
+    await window.BAZI_COMPARISON.init({query:(sql,params)=>call('query',{sql,params}),showWorkspace});
   } catch (error) {
     el("#statusText").textContent = error.message;
     if (el('#browseLoadStatus')) el('#browseLoadStatus').textContent = error.message;

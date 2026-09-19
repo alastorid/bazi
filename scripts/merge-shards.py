@@ -41,6 +41,9 @@ meta['rowCount']=db.execute('SELECT COUNT(*) FROM "命盤"').fetchone()[0]
 expected=db.execute('SELECT SUM(date_diff(\'day\',make_date(y,1,1),make_date(y+1,1,1)))*24 FROM UNNEST(?) t(y)',[years]).fetchone()[0]+len(meta['supplementalDates'])*24
 assert meta['rowCount']==expected,(meta['rowCount'],expected)
 assert db.execute('SELECT COUNT(DISTINCT "KEY") FROM "命盤"').fetchone()[0]==expected
+db.execute('''UPDATE "命盤比較星曜" SET
+ "星曜類型"=CASE "星曜類型" WHEN 'major' THEN '主星' WHEN 'minor' THEN '輔曜' ELSE "星曜類型" END,
+ "星性質"=CASE "星性質" WHEN 'benefic' THEN '吉性' WHEN 'challenging' THEN '煞性' WHEN 'mixed' THEN '兼具吉凶' ELSE "星性質" END''')
 report=finalize_ranking(db,meta,min(10000,expected))
 db.execute('''CREATE OR REPLACE VIEW "命盤總覽" AS
 SELECT m.*,r."百分位" AS "全域PR",r."排名序" AS "全域名次",r."總序",COALESCE(p."吉格數",0)::INTEGER AS "吉格數",COALESCE(p."凶格數",0)::INTEGER AS "凶格數",p."最高稀有度",p."吉格",p."凶格"
