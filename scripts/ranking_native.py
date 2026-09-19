@@ -78,7 +78,9 @@ def finalize_ranking(db,meta,min_sample=10000):
       '分組均值診斷，不能保證每張高PR命盤無凶格，也不是現實人生驗證' AS "解釋"
       FROM "排名驗證" t LEFT JOIN "排名驗證" b ON t."分組"=b."分組" AND t."群組"=b."群組" AND b."層級"='底端' WHERE t."層級"='頂端' ''')
     global_status=db.execute('SELECT "結論" FROM "排名驗證結論" WHERE "分組"=\'全期\'').fetchone()[0]
-    assert global_status=='方向一致', f'Global ranking diagnostic failed: {global_status}'
+    if global_status!='方向一致':
+        evidence=db.execute('SELECT * FROM "排名驗證" WHERE "分組"=\'全期\' ORDER BY "層級"').fetchall()
+        raise AssertionError(f'Global ranking diagnostic failed: {global_status}; evidence={evidence}')
     # Quantify ±10% palace-weight sensitivity, using all charts and tie-aware ranks.
     totals=dict(db.execute('SELECT "KEY",value FROM potentials').fetchall())
     baseline=sorted(totals,key=lambda k:(-totals[k],k))
