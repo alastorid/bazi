@@ -28,6 +28,7 @@ try {
   });
   await expect(page.locator('.timing-period')).toHaveCount(24);
   await expect(page.locator('.compare-verdict')).toContainText('甲較前');
+  await expect.poll(()=>page.locator('.timing-pair').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   fs.mkdirSync('test-results',{recursive:true});
   await page.screenshot({path:'test-results/comparison-fixture.png',fullPage:true});
   await page.locator('#compareSwap').click();

@@ -35,11 +35,15 @@ def build_life_tables(db,meta):
     if db.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name='命盤格局明細'").fetchone()[0]:
         for key,name in db.execute('''SELECT "KEY","名稱" FROM "命盤格局明細" WHERE "規則ID" IN ('F-ZIFU-YAN','F-SHA-CHAO') AND "吉凶"='吉' ''').fetchall():
             scoped.setdefault(key,[]).append(name)
-    scan=db.cursor()
-    scan.execute('SELECT * FROM "命盤" ORDER BY "KEY"')
-    columns=[d[0] for d in scan.description]
+    # Fully consume each page before writing. A separate streaming cursor keeps
+    # a read transaction alive and can block the writer's automatic checkpoint.
+    columns=[d[0] for d in db.execute('SELECT * FROM "命盤" LIMIT 0').description]
+    last_key=None
     count=qualified=0
-    while batch:=scan.fetchmany(256):
+    while True:
+        batch=db.execute('SELECT * FROM "命盤" '+('WHERE "KEY">? ' if last_key is not None else '')+'ORDER BY "KEY" LIMIT 256',
+                         [last_key] if last_key is not None else []).fetchall()
+        if not batch:break
         for values in batch:
             row=dict(zip(columns,values));key=row['KEY']
             stars={p:[] for p in meta['palaces']}
@@ -59,7 +63,9 @@ def build_life_tables(db,meta):
             buffers['命盤時運'].append((key,result['good_palaces'],result['prime_good_years'],result['prime_bad_years'],result['weighted_good_years'],result['weighted_bad_years'],result['timing_score'],result['first_good_age'],int(result['late_only']),result['unassigned_years'],int(result['qualified']),'；'.join(result['reasons']),result['late_good_years'],result['late_bad_years']))
             count+=1;qualified+=int(result['qualified'])
         flush()
-    scan.close()
+        last_key=row['KEY']
+        if count%4096==0 or count==meta['rowCount']:
+            print(f'Timing progress: {count}/{meta["rowCount"]}',flush=True)
     assert count==meta['rowCount']
     assert db.execute('SELECT COUNT(*),COUNT(DISTINCT "KEY") FROM "命盤時運"').fetchone()==(count,count)
     for name in ['命盤宮位判讀','命盤大限明細']:

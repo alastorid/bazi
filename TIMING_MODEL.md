@@ -22,7 +22,7 @@
 - `scripts/life_timing.py`：大限區間驗證、逐歲權重、純吉／風險年數、晚發與資格原因。
 - `scripts/verify-palace-evidence.py`、`scripts/verify-life-timing.py`：合成反事實測試；已通過。
 - `scripts/life_native.py`：四張獨立資料表，已接入合併階段；正式資料尚未重跑。
-- `scripts/timing_rank.py`：資格優先的排序與資格群體 PR；全體不合格時不產生假高 PR。小型 SQL 測試通過，但尚未替换舊 `ranking_native.py` 主入口。
+- `scripts/timing_rank.py`：資格優先的排序與資格群體 PR；全體不合格時不產生假高 PR。已接入 `ranking_native.py` 主入口，小型 SQL 測試通過；正式資料驗收仍待 Actions 完成。
 - `scripts/verify-life-native.py`：直接跑 DuckDB 的區間持久化、早晚對照、資格排序與無合格者回歸測試。
 
 ## 尚未完成，不能宣稱本輪已驗收

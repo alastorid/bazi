@@ -40,3 +40,21 @@ assert report['rows']==2 and report['qualified']==1
 assert report['ageIntersectionErrors']==0 and report['referenceChanges']==0
 assert db.execute('SELECT SUM("樣本數") FROM "排名驗證" WHERE "分組"=\'全期\'').fetchone()[0]==2
 print('Native timing adapter verified: exact source ranges, unchanged palace quality, early/late qualification and persistence.')
+
+# Exercise multiple pages on disk with frequent automatic checkpoints. The
+# former streaming reader could hold the writer waiting indefinitely here.
+import tempfile
+from pathlib import Path
+with tempfile.TemporaryDirectory(prefix='bazi-timing-fixture-') as directory:
+    disk=duckdb.connect(str(Path(directory)/'fixture.duckdb'))
+    disk.execute("SET checkpoint_threshold='1KB'")
+    disk.execute('CREATE TABLE "命盤" ('+','.join('"'+n+'" VARCHAR' for n in fields)+')')
+    template=db.execute('SELECT * FROM "命盤" LIMIT 1').fetchone()
+    disk.executemany('INSERT INTO "命盤" VALUES ('+','.join('?' for _ in fields)+')',
+                     [(f'fixture-{i:04d}',*template[1:]) for i in range(600)])
+    fixture_meta={'palaces':palaces,'stars':names,'tables':{},'rowCount':600}
+    build_life_tables(disk,fixture_meta)
+    assert disk.execute('SELECT COUNT(DISTINCT "KEY") FROM "命盤大限明細"').fetchone()[0]==600
+    disk.execute('CHECKPOINT')
+    disk.close()
+print('Disk checkpoint regression verified: 600 synthetic charts across three read/write pages.')
