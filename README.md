@@ -63,6 +63,8 @@ The repository does not commit a precomputed database. Annual runner jobs use so
 
 ## Comparison ranking
 
+The timing-first replacement is implemented but awaiting production acceptance. See [TIMING_MODEL.md](TIMING_MODEL.md) for its source boundaries and [todo.md](todo.md) for deployment status. It persists actual decadal arrival ages, palace evidence, prime-age favorable/risk years and qualification separately. Unqualified charts have no qualification PR; relative population position remains separately queryable. Age weights and admission thresholds are published product policies, not quantitative rules attributed to the teaching materials. The paragraphs below describe the previously deployed natal-only baseline, not validation of the new timing model.
+
 `命盤排名` is separate from raw charts and legacy annual scoring. Persisted palace and star profiles explain the model inputs; `命盤對比明細` records each chart against the selected reference. Arbitrary pairs are displayed by querying those precomputed profiles, without downloading the chart algorithm.
 
 The comparator is additive: the weighted difference between two palace profiles equals potential(A) minus potential(B). Changing the reference cannot change rank. Numeric strengths and palace weights are model parameters, not numeric laws supplied by the teaching materials. Unknown brightness remains unknown; challenging stars do not become universally auspicious at high dignity, and 地空 has no generic single-star contribution.

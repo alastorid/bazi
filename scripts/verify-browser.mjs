@@ -1,14 +1,15 @@
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-const server=spawn('python3',['-m','http.server','8173','--directory','dist'],{stdio:'ignore'});
+const baseURL=process.env.BAZI_TEST_URL||'http://127.0.0.1:8173/';
+const server=process.env.BAZI_TEST_URL?null:spawn('python3',['-m','http.server','8173','--directory','dist'],{stdio:'ignore'});
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:960}});
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 try {
-  await expect.poll(async()=>{try{return (await fetch('http://127.0.0.1:8173/')).status;}catch{return 0;}},{timeout:10000}).toBe(200);
-  await page.goto('http://127.0.0.1:8173/');
+  await expect.poll(async()=>{try{return (await fetch(baseURL)).status;}catch{return 0;}},{timeout:10000}).toBe(200);
+  await page.goto(baseURL);
   await expect(page.locator('#browseRows tr').first()).toBeVisible({timeout:120000});
   await expect(page.locator('#browseRows tr')).toHaveCount(100);
   await expect(page.locator('#browseMetrics')).not.toContainText('非數值');
@@ -19,6 +20,13 @@ try {
     if(meta.rowCount!==expected)throw new Error('完整年度與指定日期筆數不符');
     const counts=await call('query',{sql:'SELECT COUNT(*) AS n,COUNT(DISTINCT "KEY") AS u FROM "命盤排名"'});
     if(counts.rows[0].n!==expected||counts.rows[0].u!==expected)throw new Error('瀏覽器內排名筆數不符');
+    if(!meta.timing)throw new Error('缺少大限模型資料');
+    const timing=await call('query',{sql:`SELECT
+      (SELECT COUNT(*) FROM "命盤大限明細") AS periods,
+      COUNT(*) FILTER(WHERE "評選合格"=0 AND "百分位" IS NOT NULL) AS false_pr,
+      COUNT(*) FILTER(WHERE "百分位">=99 AND ("吉宮數"<3 OR "壯年吉限年數"<10 OR "壯年風險年數">10 OR "晚發限定"=1)) AS false_top
+      FROM "命盤排名"`});
+    if(timing.rows[0].periods!==expected*12||timing.rows[0].false_pr||timing.rows[0].false_top)throw new Error('瀏覽器內大限與資格門檻驗證失敗');
     const numeric=await call('query',{sql:`SELECT SUM(v) AS total,CAST(-12.34 AS DECIMAL(10,2)) AS decimal,CAST('123456789012345678901234567890' AS HUGEINT) AS huge FROM (VALUES (1),(2)) t(v)`});
     const row=numeric.rows[0];
     if(row.total!==3||row.decimal!==-12.34||row.huge!=='123456789012345678901234567890')throw new Error('DuckDB 數值傳遞精度不符：'+JSON.stringify(row));
@@ -68,6 +76,7 @@ try {
   fs.mkdirSync('test-results',{recursive:true});
   await page.locator('[data-workspace-tab="comparison"]').click();
   await expect(page.locator('.timing-period')).toHaveCount(24,{timeout:30000});
+  await expect.poll(()=>page.locator('.timing-pair').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await expect(page.locator('.compare-verdict')).toContainText('甲較前');
   await page.screenshot({path:'test-results/comparison.png',fullPage:true});
   await page.locator('#compareSwap').click();
@@ -106,4 +115,4 @@ try {
   console.error('Browser errors:',errors);
   console.error('Page text:',await page.locator('body').innerText());
   throw error;
-} finally {await browser.close();server.kill();}
+} finally {await browser.close();server?.kill();}
