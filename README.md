@@ -4,7 +4,7 @@ GitHub Pages workspace with a filterable database browser, SQL terminal, calenda
 
 ## Dataset
 
-- 87,696 verified rows, every day in 2026—2035 plus the two designated dates 1946-06-14 and 1991-12-19, each with 12 Chinese two-hour periods × 2 genders. Native DuckDB: 188.01 MiB, gzip: 39.21 MiB.
+- 87,696 verified rows, every day in 2026—2035 plus the two designated dates 1946-06-14 and 1991-12-19, each with 12 Chinese two-hour periods × 2 genders. Native DuckDB: 224.51 MiB, gzip: 45.52 MiB.
 - Primary key format: `YYYYMMDD-時辰-性別`, for example `20270810-子時-女`.
 - Every row has a direct `命盤連結` to its Metis Zi Wei chart.
 - One deliberately wide, first-normal-form DuckDB table named `命盤` and a `命盤總覽` view with good/bad pattern counts, names, and maximum structural rarity.
@@ -63,15 +63,13 @@ The repository does not commit a precomputed database. Annual runner jobs use so
 
 ## Comparison ranking
 
-The timing-first replacement is implemented but awaiting production acceptance. See [TIMING_MODEL.md](TIMING_MODEL.md) for its source boundaries and [todo.md](todo.md) for deployment status. It persists actual decadal arrival ages, palace evidence, prime-age favorable/risk years and qualification separately. Unqualified charts have no qualification PR; relative population position remains separately queryable. Age weights and admission thresholds are published product policies, not quantitative rules attributed to the teaching materials. The paragraphs below describe the previously deployed natal-only baseline, not validation of the new timing model.
+The timing-first model persists actual decadal arrival ages, palace evidence, prime-age favorable/risk years and qualification separately. See [TIMING_MODEL.md](TIMING_MODEL.md) for source boundaries and [todo.md](todo.md) for acceptance status. Of 87,696 charts, 12,712 qualify. Unqualified charts have no qualification PR; relative population position remains separately queryable.
 
-`命盤排名` is separate from raw charts and legacy annual scoring. Persisted palace and star profiles explain the model inputs; `命盤對比明細` records each chart against the selected reference. Arbitrary pairs are displayed by querying those precomputed profiles, without downloading the chart algorithm.
+`命盤宮位判讀`, `命盤大限明細`, `命盤時運` and `大限模型政策` retain the evidence. Admission precedes timing score and favorable-palace count in the ordering. Age weights and admission thresholds are published product policies, not quantitative rules attributed to the teaching materials. This is natal-palace evidence evaluated at actual decadal arrival ages, not an invented annual or decadal-transformation algorithm. Unknown brightness remains unknown; high-dignity challenging stars are not automatically favorable, and 地空 has no generic single-star contribution.
 
-The comparator is additive: the weighted difference between two palace profiles equals potential(A) minus potential(B). Changing the reference cannot change rank. Numeric strengths and palace weights are model parameters, not numeric laws supplied by the teaching materials. Unknown brightness remains unknown; challenging stars do not become universally auspicious at high dignity, and 地空 has no generic single-star contribution.
+Equal qualification, timing score and favorable-palace count share `排名序`; `總序` is only a stable display order. Higher percentile means higher rank within qualifying charts. Subset SQL includes only qualified charts and uses `RANK` to preserve ties. Raw charts and legacy annual scoring remain separate from the new main ranking.
 
-Equal model values share `排名序`; `總序` is only a stable display order. Higher percentile means higher model rank. Subset SQL uses `RANK`, not `ROW_NUMBER`, to preserve ties. Annual legacy scoring tables retain their annual scope.
-
-The final build records year/month/gender diagnostics, top/bottom snapshots, top-one-percent characteristics, 24 palace-weight sensitivity scenarios and five reference checks. Statistical direction checks are not proof about real lives, and some signals overlap the model's inputs. Subgroup warnings remain inspectable instead of being hidden. The calendar offers an optional rank-percentile mode alongside its original good/bad-pattern colors.
+The runner independently recomputes age intersections in SQL, audits every PR99 chart, records six age-weight ±10% scenarios and five reference checks. These checks establish model consistency, not real-life predictions. The comparison displays all twelve periods for each chart; the calendar retains good/bad-pattern colors and shows unqualified charts in gray in rank mode.
 
 
 ## Example SQL
