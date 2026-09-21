@@ -2,6 +2,10 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {nativeFingerprint} from './data-fingerprint.mjs';
 const range=process.argv[2];
+for(const script of ['verify-life-timing.py','verify-palace-evidence.py','verify-life-native.py']){
+  const test=spawnSync('python3',['scripts/'+script],{stdio:'inherit'});
+  if(test.status!==0)process.exit(test.status??1);
+}
 const merge=spawnSync('python3',['scripts/merge-shards.py',range,...(process.argv[3]?[process.argv[3]]:[])],{stdio:'inherit'});
 if(merge.status!==0)process.exit(merge.status??1);
 const meta=JSON.parse(fs.readFileSync('data/metadata.json','utf8'));

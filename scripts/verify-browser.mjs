@@ -67,11 +67,11 @@ try {
   await expect.poll(()=>page.locator('#browseGrid').evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   fs.mkdirSync('test-results',{recursive:true});
   await page.locator('[data-workspace-tab="comparison"]').click();
-  await expect(page.locator('.palace-comparisons article')).toHaveCount(12,{timeout:30000});
-  await expect(page.locator('.compare-verdict')).toContainText('甲較高');
+  await expect(page.locator('.timing-period')).toHaveCount(24,{timeout:30000});
+  await expect(page.locator('.compare-verdict')).toContainText('甲較前');
   await page.screenshot({path:'test-results/comparison.png',fullPage:true});
   await page.locator('#compareSwap').click();
-  await expect(page.locator('.compare-verdict')).toContainText('乙較高',{timeout:30000});
+  await expect(page.locator('.compare-verdict')).toContainText('乙較前',{timeout:30000});
   const key=await page.locator('#compareA').inputValue();
   await page.locator('#compareB').fill(key);
   await page.locator('#compareRun').click();

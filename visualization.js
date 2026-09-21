@@ -19,6 +19,7 @@
   const root = () => document.querySelector("#visualizationView");
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const key = (date, hour, gender) => `${date}|${hour}|${gender}`;
+  const prLabel = value => value == null ? '未達門檻' : Number(value).toFixed(2);
   const pad = (number) => String(number).padStart(2, "0");
   const localDate = (date = new Date()) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
@@ -113,7 +114,7 @@
       const start = chunk * CHUNK_DAYS;
       const end = Math.min(state.dates.length - 1, start + CHUNK_DAYS - 1);
       try {
-        const result = await state.query(`SELECT "KEY","命盤連結","公曆日期","時辰","時辰序號","性別","吉格數","凶格數","吉格","凶格","全域PR","全域名次" FROM "命盤總覽" WHERE "公曆日期" BETWEEN '${state.dates[start]}' AND '${state.dates[end]}' ORDER BY "公曆日期","時辰序號","性別";`);
+        const result = await state.query(`SELECT "KEY","命盤連結","公曆日期","時辰","時辰序號","性別","吉格數","凶格數","吉格","凶格","全域PR","全域名次","吉宮數","壯年吉限年數","壯年風險年數","首次吉限年齡","未達門檻原因" FROM "命盤總覽" WHERE "公曆日期" BETWEEN '${state.dates[start]}' AND '${state.dates[end]}' ORDER BY "公曆日期","時辰序號","性別";`);
         for (const row of result.rows) state.byCell.set(key(row.公曆日期, Number(row.時辰序號), row.性別), row);
         state.loadedChunks.add(chunk);
         root().querySelector(".viz-loading")?.remove();
@@ -183,7 +184,7 @@
     tooltip.hidden = false;
     tooltip.style.left = `${Math.min(window.innerWidth - 310, event.clientX + 12)}px`;
     tooltip.style.top = `${Math.min(window.innerHeight - 110, event.clientY + 12)}px`;
-    tooltip.textContent = `${row.公曆日期} · ${row.時辰} · ${row.性別} · 全域PR ${Number(row.全域PR).toFixed(2)}\n吉格 ${row.吉格數}：${String(row.吉格 || "無").replaceAll(",", "、")}\n凶格 ${row.凶格數}：${String(row.凶格 || "無").replaceAll(",", "、")}`;
+    tooltip.textContent = `${row.公曆日期} · ${row.時辰} · ${row.性別} · 全域PR ${prLabel(row.全域PR)}\n吉格 ${row.吉格數}：${String(row.吉格 || "無").replaceAll(",", "、")}\n凶格 ${row.凶格數}：${String(row.凶格 || "無").replaceAll(",", "、")}`;
   }
 
   function choose(event) {
@@ -197,8 +198,8 @@
 
   function renderChartDetail(row) {
     root().querySelector(".viz-detail").innerHTML = `<div class="viz-detail-heading"><span>${esc(row.性別)}命</span><strong>${esc(row.公曆日期)}</strong><b>${esc(row.時辰)}</b><small>${esc(row.KEY)}</small></div>
-      <div class="viz-pr-detail"><strong>${Number(row.全域PR).toFixed(2)}</strong><span>全域PR · 第 ${Number(row.全域名次).toLocaleString()} 名</span><button id="compareSelected">加入命盤比較 ↗</button></div>
-      <div class="viz-detail-group good"><header><b>吉格</b><em>${Number(row.吉格數)} 格</em></header><p>${esc(String(row.吉格 || "無").replaceAll(",", "、"))}</p></div>
+      <div class="viz-pr-detail"><strong>${prLabel(row.全域PR)}</strong><span>適時PR · ${row.吉宮數} 吉宮 · 壯年純吉 ${row.壯年吉限年數} 年／風險 ${row.壯年風險年數} 年</span><button id="compareSelected">加入命盤比較 ↗</button></div>
+      <p class="timing-reason">${esc(row.未達門檻原因 || "符合適時吉限門檻")}</p><div class="viz-detail-group good"><header><b>吉格</b><em>${Number(row.吉格數)} 格</em></header><p>${esc(String(row.吉格 || "無").replaceAll(",", "、"))}</p></div>
       <div class="viz-detail-group bad"><header><b>凶格</b><em>${Number(row.凶格數)} 格</em></header><p>${esc(String(row.凶格 || "無").replaceAll(",", "、"))}</p></div>
       <a class="viz-chart-link" href="${esc(row.命盤連結)}" target="_blank" rel="noopener noreferrer">開啟命盤 ↗</a>
       <small class="viz-double-hint">也可雙擊月曆中的色塊直接開啟</small>`;
@@ -305,14 +306,14 @@
         const years=state.metadata.calendarYears;const where=`"年" BETWEEN ${years[0]} AND ${years.at(-1)}${mode==='女＋男'?'':` AND "性別"='${mode}'`}`;
         const base=`SELECT * FROM "命盤總覽" WHERE ${where}`;
         const results=await Promise.all([
-          state.query(`${base} ORDER BY "全域PR" DESC,"KEY" LIMIT 5`),state.query(`${base} ORDER BY "全域PR","KEY" LIMIT 5`),
-          state.query(`WITH r AS (SELECT *,substr("公曆日期",1,7) AS "年月",ROW_NUMBER() OVER(PARTITION BY substr("公曆日期",1,7) ORDER BY "全域PR" DESC,"KEY") AS n FROM "命盤總覽" WHERE ${where}) SELECT "年月",COUNT(*) AS "樣本數",AVG("全域PR") AS "平均PR",MIN("全域PR") AS "最低PR",MAX("全域PR") AS "最高PR",MAX(CASE WHEN n=1 THEN "公曆日期" END) AS "目標日期",MAX(CASE WHEN n=1 THEN "時辰序號" END) AS "目標時辰序號",MAX(CASE WHEN n=1 THEN "性別" END) AS "目標性別" FROM r GROUP BY "年月" ORDER BY "年月"`),
+          state.query(`${base} AND "評選合格"=1 ORDER BY "全域名次","KEY" LIMIT 5`),state.query(`${base} ORDER BY "全域名次" DESC,"KEY" LIMIT 5`),
+          state.query(`WITH r AS (SELECT *,substr("公曆日期",1,7) AS "年月",ROW_NUMBER() OVER(PARTITION BY substr("公曆日期",1,7) ORDER BY "全域PR" DESC,"KEY") AS n FROM "命盤總覽" WHERE ${where}) SELECT "年月",COUNT(*) AS "樣本數",COUNT("全域PR") AS "合格數",AVG("全域PR") AS "平均PR",MIN("全域PR") AS "最低PR",MAX("全域PR") AS "最高PR",MAX(CASE WHEN n=1 THEN "公曆日期" END) AS "目標日期",MAX(CASE WHEN n=1 THEN "時辰序號" END) AS "目標時辰序號",MAX(CASE WHEN n=1 THEN "性別" END) AS "目標性別" FROM r GROUP BY "年月" ORDER BY "年月"`),
         ]);state.rankCache.set(mode,results.map(r=>r.rows));
       }
       if(state.mode!==mode||state.measure!=='rank'||state.selected)return;
       const [top,bottom,months]=state.rankCache.get(mode);
-      const list=(rows,title)=>`<section class="viz-stat-section"><h3>${title}</h3>${rows.map(r=>`<button class="viz-stat-link" ${targetAttributes(r)}><b>PR ${Number(r.全域PR).toFixed(2)}</b><span>${esc(r.公曆日期)} · ${esc(r.時辰)} · ${esc(r.性別)}</span><em>${counts(r)}</em></button>`).join('')}</section>`;
-      detail.innerHTML=`<div class="viz-overview-heading"><strong>排名統計</strong><span>${mode} · PR 為全資料範圍相對名次</span></div>${list(top,'頂端五張')}${list(bottom,'底端五張')}<section class="viz-stat-section"><h3>月份分佈</h3>${months.map(r=>`<button class="viz-stat-link" ${targetAttributes(r)}><b>${esc(r.年月)}</b><span>平均 ${Number(r.平均PR).toFixed(1)} · ${r.樣本數} 張</span><em>${Number(r.最低PR).toFixed(1)}—${Number(r.最高PR).toFixed(1)}</em></button>`).join('')}</section>`;
+      const list=(rows,title)=>`<section class="viz-stat-section"><h3>${title}</h3>${rows.map(r=>`<button class="viz-stat-link" ${targetAttributes(r)}><b>PR ${prLabel(r.全域PR)}</b><span>${esc(r.公曆日期)} · ${esc(r.時辰)} · ${esc(r.性別)}</span><em>${counts(r)}</em></button>`).join('')}</section>`;
+      detail.innerHTML=`<div class="viz-overview-heading"><strong>排名統計</strong><span>${mode} · 適時PR限合格群體；灰色為未達門檻</span></div>${list(top,'頂端五張')}${list(bottom,'底端五張')}<section class="viz-stat-section"><h3>月份分佈</h3>${months.map(r=>`<button class="viz-stat-link" ${targetAttributes(r)}><b>${esc(r.年月)}</b><span>平均 ${(r.平均PR==null?'—':Number(r.平均PR).toFixed(1))} · ${r.合格數} 合格／${r.樣本數} 張</span><em>${(r.最低PR==null?'—':Number(r.最低PR).toFixed(1))}—${(r.最高PR==null?'—':Number(r.最高PR).toFixed(1))}</em></button>`).join('')}</section>`;
     }catch(error){if(state.measure==='rank')detail.textContent='排名統計載入失敗：'+error.message;}
   }
 
@@ -360,7 +361,7 @@
 
   function drawBand(context, row, x, y, width, height) {
     if (!row) { context.fillStyle = "rgba(127,127,127,.055)"; context.fillRect(x, y, width, height); return; }
-    context.fillStyle = state.measure==='rank'?`hsl(${Math.round(Number(row.全域PR)*1.2)} 60% 60%)`:color(Number(row.吉格數), Number(row.凶格數));
+    context.fillStyle = state.measure==='rank'?(row.全域PR==null?'#aeb4b0':`hsl(${Math.round(Number(row.全域PR)*1.2)} 60% 60%)`):color(Number(row.吉格數), Number(row.凶格數));
     context.fillRect(x, y, width, height);
     if (state.selected?.KEY === row.KEY) {
       context.strokeStyle = "#fff"; context.lineWidth = 1.5; context.strokeRect(x + .75, y + .75, width - 1.5, height - 1.5);
